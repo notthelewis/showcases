@@ -6,16 +6,14 @@ import (
 	"swb/logger"
 )
 
-var log logger.Logger 
+var log = logger.New(os.Stderr)
 
 func main() {
-    log = logger.New(os.Stderr)
     log.Write(logger.INFO, "starting web server")
 
     http.HandleFunc("/", getRoot)
 
     // http.ListenAndServe()
-
 }
 
 func getRoot(w http.ResponseWriter, req *http.Request) {
