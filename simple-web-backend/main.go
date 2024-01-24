@@ -3,13 +3,13 @@ package main
 import (
 	"os"
     "net/http"
-	"swb/logger"
+	"swb/logging"
 )
 
-var log = logger.New(os.Stderr)
+var log = logging.New(os.Stderr)
 
 func main() {
-    log.Write(logger.INFO, "starting web server")
+    log.Write(logging.INFO, "starting web server")
 
     http.HandleFunc("/", getRoot)
 
