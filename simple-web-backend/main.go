@@ -24,14 +24,13 @@ var (
 ) 
 
 func main() {
-    _, err := log.Write(logging.INFO, "starting web server")
-    if err != nil {
+    if _, err := log.Write(logging.INFO, "starting web server");err != nil {
         panic("unable to start logger with error: " + err.Error())
     }
 
     http.HandleFunc("/", handler)
 
-    if err := http.ListenAndServe(":8080", nil); err != nil {
+    if err := http.ListenAndServeTLS(":8080", "server.pem", "server.key", nil); err != nil {
         log.Write(logging.CRIT, "unable to start web server with error: " + err.Error())
         return 
     }
@@ -67,7 +66,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
         return
     }
 
-    log.Write(logging.INFO, "index.html")
+    go log.Write(logging.INFO, "index.html")
 }
 
 func handle404(w http.ResponseWriter, req *http.Request) {
