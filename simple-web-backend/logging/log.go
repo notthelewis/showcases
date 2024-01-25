@@ -3,10 +3,9 @@ package logging
 import (
 	"io"
 	"strings"
+	typederrors "swb/typed-errors"
 	"sync"
 	"time"
-
-	"errors"
 )
 
 type LogEntry struct {
@@ -21,8 +20,8 @@ func (entry *LogEntry) Write(out io.Writer) (int, error) {
     levelStrLen := len(levelStr)
     msgLen := len(entry.message)
 
-    if entry.sb.Cap() < levelStrLen + msgLen {
-        entry.sb.Grow(levelStrLen + msgLen - entry.sb.Cap())
+    if entry.sb.Cap() < levelStrLen + msgLen + 1 {
+        entry.sb.Grow(levelStrLen + msgLen + 1 - entry.sb.Cap())
     }
 
     entry.sb.Reset()
@@ -32,6 +31,9 @@ func (entry *LogEntry) Write(out io.Writer) (int, error) {
     entry.sb.WriteString(entry.level.String())
     entry.sb.WriteRune(' ')
     entry.sb.WriteString(entry.message)
+    if entry.message[len(entry.message)-1] != '\n' {
+        entry.sb.WriteRune('\n')
+    }
 
     return out.Write([]byte(entry.sb.String()))
 }
@@ -55,12 +57,10 @@ var logEntryPool = sync.Pool{
 	},
 }
 
-var ErrUnableToGetPoolEntry = errors.New("FATAL - Unable to get a new log pool entry")
-
 func (l *Logger) Write(level LogLevel, msg string) (int, error) {
 	entry, ok := logEntryPool.Get().(*LogEntry)
 	if !ok {
-		return 0, ErrUnableToGetPoolEntry
+		return 0, typederrors.ErrUnableToGetPoolEntry
 	}
 
 	defer logEntryPool.Put(entry)
