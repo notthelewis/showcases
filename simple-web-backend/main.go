@@ -3,21 +3,21 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"swb/http"
 	"swb/logging"
-    "flag"
 )
 
 var (
-    logLevel = flag.String("v", "info", "The verbosity level of logs. Defaults to info")
-	log logging.Logger 
+	logLevel = flag.String("v", "info", "The verbosity level of logs. Defaults to info")
+	log      logging.Logger
 )
 
 func main() {
-    flag.Parse()
+	flag.Parse()
 
-    log = logging.New(os.Stderr, logLevel)
+	log = logging.New(os.Stderr, logLevel)
 	if _, err := log.Write(logging.INFO, "starting web server on port: 8080"); err != nil {
 		panic("unable to start logger with error: " + err.Error())
 	}

@@ -38,6 +38,10 @@ var (
 				}
 			},
 		},
+		"/two-way-binding": PageInfo{
+			fsPath:      "site/static/two-way-binding.html",
+			contentType: "text/html",
+		},
 		"/static/smooches.png": PageInfo{
 			fsPath:      "site/static/smooches.png",
 			contentType: "image/png",
@@ -47,21 +51,21 @@ var (
 			fsPath:      "site/404.html",
 			contentType: "text/html",
 			hasTemplate: true,
-            getDataFn: func(req *http.Request) map[string]any {
-                return map[string]any{
-                    "pageName": req.URL.Path,
-                }
-            },
+			getDataFn: func(req *http.Request) map[string]any {
+				return map[string]any{
+					"pageName": req.URL.Path,
+				}
+			},
 		},
 		"/500": PageInfo{
 			fsPath:      "site/500.html",
 			contentType: "text/html",
 			hasTemplate: true,
-            getDataFn: func(req *http.Request) map[string]any {
-                return map[string]any{
-                    "pageName": req.URL.Path,
-                }
-            },
+			getDataFn: func(req *http.Request) map[string]any {
+				return map[string]any{
+					"pageName": req.URL.Path,
+				}
+			},
 		},
 	}
 
@@ -91,7 +95,7 @@ func RunHTTP(log *logging.Logger) {
 func (s *Server) handler(w http.ResponseWriter, req *http.Request) {
 	page, pageFound := pages[req.URL.Path]
 	if !pageFound {
-		s.handle404(w, req, pages["/404"])
+		s.handle404(w, req, req.URL.Path)
 		return
 	}
 
@@ -107,18 +111,18 @@ func (s *Server) handler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-    s.log.Write(logging.DEBUG, "handling untemplated page")
+	s.log.Write(logging.DEBUG, "handling untemplated page")
 	pageData, err := fs.ReadFile(site, page.fsPath)
 	if err != nil {
 		s.handle500(w, req, page)
 	}
 
-    _, err = w.Write(pageData)
-    if err != nil {
-        s.log.Write(logging.INFO, "unable to write data to client")
-        s.log.WriteHTTPRequest(req, http.StatusUnprocessableEntity)
-        return
-    }
+	_, err = w.Write(pageData)
+	if err != nil {
+		s.log.Write(logging.INFO, "unable to write data to client")
+		s.log.WriteHTTPRequest(req, http.StatusUnprocessableEntity)
+		return
+	}
 
 	s.log.WriteHTTPRequest(req, http.StatusOK)
 }
@@ -156,7 +160,7 @@ func (s *Server) handle500(w http.ResponseWriter, req *http.Request, pageInfo Pa
 	}
 }
 
-func (s *Server) handle404(w http.ResponseWriter, req *http.Request, pageInfo PageInfo) {
+func (s *Server) handle404(w http.ResponseWriter, req *http.Request, pageName string) {
 	s.log.WriteHTTPRequest(req, http.StatusNotFound)
 
 	w.WriteHeader(http.StatusNotFound)
@@ -168,7 +172,7 @@ func (s *Server) handle404(w http.ResponseWriter, req *http.Request, pageInfo Pa
 		return
 	}
 
-	if err := template.Execute(w, pageInfo.getDataFn(req)); err != nil {
+	if err := template.Execute(w, pages["/404"].getDataFn(req)); err != nil {
 		w.Write(utils.StringToBytesUNSAFE(typederrors.Err404.Error()))
 		s.log.Write(logging.ALERT, err.Error())
 	}
