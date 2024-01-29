@@ -91,7 +91,7 @@ func RunHTTP(log *logging.Logger) {
 func (s *Server) handler(w http.ResponseWriter, req *http.Request) {
 	page, pageFound := pages[req.URL.Path]
 	if !pageFound {
-		s.handle404(w, req, page)
+		s.handle404(w, req, pages["/404"])
 		return
 	}
 
