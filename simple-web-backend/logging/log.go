@@ -2,12 +2,14 @@ package logging
 
 import (
 	"io"
+	"net/http"
+	"strconv"
 	"strings"
-	typederrors "swb/typed-errors"
 	"sync"
 	"time"
 )
 
+// LogEntry is effectively a single log line. This object is pooled.
 type LogEntry struct {
 	sb      strings.Builder
 	time    time.Time
@@ -15,6 +17,7 @@ type LogEntry struct {
 	message string
 }
 
+// Write sends a LogEntry to the output source. The output source could be stdout or a network source.
 func (entry *LogEntry) Write(out io.Writer) (int, error) {
     levelStr := entry.level.String()
     levelStrLen := len(levelStr)
@@ -39,10 +42,13 @@ func (entry *LogEntry) Write(out io.Writer) (int, error) {
 }
 
 type Logger struct {
+    // If I had more time or impetus, I'd use a lock-free data structure here 
     mu sync.Mutex
     writer io.Writer
+    entry LogEntry
 }
 
+// New creates a new threadsafe Logger. 
 func New(writer io.Writer) Logger {
     return Logger{
         mu: sync.Mutex{},
@@ -50,27 +56,17 @@ func New(writer io.Writer) Logger {
     }
 }
 
-var logEntryPool = sync.Pool{
-	New: func() any {
-		le := LogEntry{}
-		return &le
-	},
-}
-
 func (l *Logger) Write(level LogLevel, msg string) (int, error) {
-	entry, ok := logEntryPool.Get().(*LogEntry)
-	if !ok {
-		return 0, typederrors.ErrUnableToGetPoolEntry
-	}
-
-	defer logEntryPool.Put(entry)
-
-	entry.time = time.Now()
-	entry.level = level
-	entry.message = msg
-
     l.mu.Lock()
     defer l.mu.Unlock()
 
-    return entry.Write(l.writer)
+	l.entry.time = time.Now()
+	l.entry.level = level
+	l.entry.message = msg
+
+    return l.entry.Write(l.writer)
+}
+
+func (l *Logger) WriteHTTPRequest(req *http.Request, responseCode int) (int, error) {
+    return l.Write(INFO, req.Method + ": " + req.URL.Path + " " + strconv.Itoa(responseCode))
 }
