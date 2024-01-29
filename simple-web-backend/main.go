@@ -1,90 +1,26 @@
+// This is a simple web backend which is used to showcase how I'd approach making an internal tool that could be shipped
+// as a stand-alone binary to colleagues.
 package main
 
 import (
-	"embed"
-	"html/template"
-	"net/http"
 	"os"
+	"swb/http"
 	"swb/logging"
-	typederrors "swb/typed-errors"
-	"swb/utils"
-	"time"
 )
 
 var (
-    log = logging.New(os.Stderr)
-    
-    //go:embed site
-    site embed.FS 
-
-    pages = map[string]string {
-        "/": "site/index.html",
-        "/404": "site/404.html",
-    }
-) 
+	log = logging.New(os.Stderr)
+)
 
 func main() {
-    if _, err := log.Write(logging.INFO, "starting web server");err != nil {
-        panic("unable to start logger with error: " + err.Error())
-    }
+	if _, err := log.Write(logging.INFO, "starting web server on port: 8080"); err != nil {
+		panic("unable to start logger with error: " + err.Error())
+	}
 
-    http.HandleFunc("/", handler)
+	go http.RunHTTP(&log)
 
-    if err := http.ListenAndServeTLS(":8080", "server.pem", "server.key", nil); err != nil {
-        log.Write(logging.CRIT, "unable to start web server with error: " + err.Error())
-        return 
-    }
-}
+	/* Here is where the actual tool would operate */
 
-
-func handler(w http.ResponseWriter, req *http.Request) {
-    page, pageFound := pages[req.URL.Path]
-    if !pageFound {
-        handle404(w, req)
-        return
-    }
-
-    template, err := template.ParseFS(site, page)
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError)
-        w.Write(utils.StringToBytesUNSAFE(typederrors.Err500.Error()))
-        go log.Write(logging.ALERT, err.Error())
-        return
-    }
-
-    now := time.Now()
-
-    pageData := map[string]any{
-        "time": now.Format(time.Kitchen),
-        "isTooLate": now.Hour() < 8 || now.Hour() > 16,
-    }
-
-    if err := template.Execute(w, pageData); err != nil {
-        w.WriteHeader(http.StatusInternalServerError)
-        w.Write(utils.StringToBytesUNSAFE(typederrors.Err500.Error()))
-        go log.Write(logging.ALERT, err.Error())
-        return
-    }
-
-    go log.Write(logging.INFO, "index.html")
-}
-
-func handle404(w http.ResponseWriter, req *http.Request) {
-    w.WriteHeader(http.StatusNotFound)
-
-    template, err := template.ParseFS(site, pages["/404"])
-    if err != nil {
-        w.Write(utils.StringToBytesUNSAFE(typederrors.Err500.Error()))
-        go log.Write(logging.CRIT, err.Error())
-        return
-    }
-
-    pageData := map[string]any {
-        "pageName": req.URL.Path,
-    }
-
-    if err := template.Execute(w, pageData); err != nil {
-        w.Write(utils.StringToBytesUNSAFE(typederrors.Err404.Error()))
-        go log.Write(logging.ALERT, err.Error())
-    }
+	// This is an infinite select, to ensure that the HTTP server continues to run
+	select {}
 }
