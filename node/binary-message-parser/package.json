@@ -1,0 +1,30 @@
+{
+    "name": "typescript-template",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "jest",
+        "compile": "npx tsup",
+        "compile:live": "nodemon --watch 'src/**/*.ts' --exec \"ts-node\" src/index.ts",
+        "start": "npm run compile:live",
+        "test:integration": "npx tsc -p ./test_client && node ./test_client/dist/test_client/index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@jest/types": "^28.1.3",
+        "@types/jest": "^28.1.6",
+        "@types/node": "^18.6.3",
+        "jest": "^28.1.3",
+        "nodemon": "^2.0.19",
+        "ts-jest": "^28.0.7",
+        "ts-node": "^10.9.1",
+        "tsup": "^6.1.2"
+    },
+    "dependencies": {
+        "strtok3": "^6.3.0",
+        "token-types": "^4.2.0"
+    }
+}
