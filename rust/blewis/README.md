@@ -9,7 +9,8 @@ A redis alternative with some niceties.
     with a _true_ binary protocol. The main reason for this is because I find protocols with a delimiter between fields 
     innefficient when compared with protocols where the encoding is properly specified. My plan is to build a  protocol 
     from the ground up to meet my usecase. I considered using ASN.1 and ProtoBuf, though I want to try and keep external
-    dependencies down to almost zero. I want to be accountable for as much of this code as possible.
+    dependencies down to almost zero. I want to be accountable for as much of this code as possible. Full specification
+    can be found at: PROTO.md
 
 2) Using lock-free data structures for speedy-quick, safe concurrency.
     I want to use lock-free data structures for concurrency, as opposed to mutexes. Redis' codebase is littered with 
