@@ -38,11 +38,16 @@ then each data type is encoded differently.
 | map     ! 1 ! 1 ! 1 |
 |---------!---!---!---|
 ```
-The reason for this format is because the encode and decode implementations will be _almost_ branchless, regardless
-of whatever is being chosen. There are a couple down sides to this approach. The first and foremost being protocol flexibility.
+The reason for this format is because the encode and decode implementations could be _almost_ branchless, regardless if 
+considered properly. There are a couple down sides to this approach. 
 
 I've gone for the approach of maximum entropy; if later on down the line I wanted to modify the protocol, it would likely
-mean large modifications 
+mean large modifications. I'm willing to take that risk on in order to ensure that data is encoded in as small a fashion
+as is possible. 
+
+I'm also tempted to use some kind of compression for large strings / arrays / maps. I'm thinking of using Facebook's Zstandard,
+as there's an implementation for it in almost all languages. This should make using it on different clients quite
+easy. 
 
 ## Integer
 
@@ -276,9 +281,10 @@ For example, an array containing a single u8 of value 256 would be encoded like 
 
 ```
 
-
 ## Map
 
 A map is a collection of key-value tuples. This is encoded in an almost identical fashion to how an Array is encoded, by
-specifying the total number of entries (both key & value) that are in the map, then 
+specifying the total number of entries (key & value) that are in the map first, then by adding the data types required
+afterwards. 
+
 
