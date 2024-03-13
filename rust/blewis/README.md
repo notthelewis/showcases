@@ -12,11 +12,11 @@ A redis alternative with some niceties.
     dependencies down to almost zero. I want to be accountable for as much of this code as possible. Full specification
     can be found at: PROTO.md
 
-2) Using lock-free data structures for speedy-quick, safe concurrency.
-    I want to use lock-free data structures for concurrency, as opposed to mutexes. Redis' codebase is littered with 
-    mutexes **which is fine** but I want to try and better understand lock-free data structures, as this is something 
-    that has been on my list of things to learn for a while. I *believe* that I may be able to get *some* performance
-    speed ups in *some* cases. Even if not, I just want to _truly_ understand lock-free programming. 
+2) Using lock-free data structures for speedy-quick, safe concurrency in *SOME* scenarios.
+    I want to use lock-free data structures for concurrency, as opposed to mutexes, in a few places. Redis' codebase is 
+    littered with mutexes **which is fine** but I want to try and better understand lock-free data structures, as this 
+    is something that has been on my list of things to learn for a while. I *believe* that I may be able to get *some* 
+    performance speed ups in *some* cases. Even if not, I just want to _truly_ understand lock-free programming. 
 
 3) Support TCP, UDP, unix sockets and HTTP and web sockets out of the box. 
     RESP could _theoretically_ support UDP but it doesn't. It could also _theoretically_ support HTTP but it doesn't.
