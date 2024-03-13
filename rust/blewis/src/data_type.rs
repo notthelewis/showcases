@@ -6,7 +6,7 @@ pub(crate) enum DataType {
     String(Bytes),
     Error(ErrorDataType),
     Array(Box<DataType>),
-    Map(Box<(DataType, DataType)>),
+    Map(Box<MapDataType>),
 }
 
 pub(crate) enum IntegerDataType {
@@ -14,10 +14,12 @@ pub(crate) enum IntegerDataType {
     Medium(u32),
     Large(u64),
     FloatingSmall(f32),
-    FloatingLarge(f64)
+    FloatingLarge(f64),
 }
 
 pub(crate) struct ErrorDataType {
     err_code: u8,
-    err_msg: Bytes
+    err_msg: Bytes,
 }
+
+pub struct MapDataType(DataType, DataType);
