@@ -8,13 +8,13 @@ do some bit-packing and such.
 
 # Spec
 
-I'm going to start off only supporting the following data types;
+I'm only supporting the following data types;
 1) integer
 2) bool
 3) string
 4) error
 5) array
-6) set
+6) map
 
 Every encoded message is prepended with variable length meta data. The first 3 bits follow this format,
 then each data type is encoded differently.
@@ -35,7 +35,7 @@ then each data type is encoded differently.
 |---------!---!---!---|
 | array   ! 1 ! 1 ! 0 |
 |---------!---!---!---|
-| set     ! 1 ! 1 ! 1 |
+| map     ! 1 ! 1 ! 1 |
 |---------!---!---!---|
 ```
 The reason for this format is because the encode and decode implementations will be _almost_ branchless, regardless
@@ -275,4 +275,10 @@ For example, an array containing a single u8 of value 256 would be encoded like 
 |   array   |  <-- padding -->  |                         length (1)                            |   u8                          |   value(256)                  |
 
 ```
+
+
+## Map
+
+A map is a collection of key-value tuples. This is encoded in an almost identical fashion to how an Array is encoded, by
+specifying the total number of entries (both key & value) that are in the map, then 
 
