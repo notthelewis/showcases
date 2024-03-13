@@ -1,0 +1,28 @@
+# Considerations 
+
+This file documents potential considerations for various parts of this project. 
+
+### Security
+- Implementation could be vulnerable to a slow-loris attack on decode routine for maps & arrays
+- Zip bombs could be a threat if compression is used
+- Implementation could be vulnerable to overflow if decoding nested structures (i.e. array[array[string], string])
+    - To mitigate, both encoding and decoding implementations should enforce limits on recursive, unsized elements. 
+      This could be exposed as as a configurable parameter, with a sane default chosen (3 levels deep for example)
+
+### Performance
+- None-blocking IO may be a big win for performance. I.e. epoll() on Linux, kqueue on BSD. For Rust, Mio or Tokio (which uses mio) 
+  handles a lot of the implementation details here. Libuv is a longstanding alternative, written in C++ and used by NodeJS
+- Object pooling may be a big win too
+- Could be a ton of branching logic in the decode routine
+- Some of the larger int types could encode/decode quite poorly on 32bit machines (i.e. u64, f64)
+
+## Libraries
+- [anyhow](https://docs.rs/anyhow/latest/anyhow/)
+    - Simplifies error handling 
+
+- [bytes](https://docs.rs/bytes/latest/bytes/)
+    - Used for efficient copies of buffers from net requests 
+
+- [bitreader](https://docs.rs/bitreader/latest/src/bitreader/lib.rs.html#69-77)
+    - Used for reading a `&'[u8]` at a bit-level granularity (super convenient)
+        - Potentially could add some SIMD... Could be a good side project
