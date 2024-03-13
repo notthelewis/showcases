@@ -1,6 +1,5 @@
-mod encoder;
 mod data_type;
 mod decoder;
+mod encoder;
 
-fn main()  {
-}
+fn main() {}
