@@ -27,7 +27,7 @@ A redis alternative with some niceties.
     Also the more protocols I support the more likely `blewis` is to be actually used by a real human... Providing that
     it's not total dog 💩.
 
-4) Have different mediums of storage **Undecided**
+4) _**Undecided**_ Have different mediums of storage 
     Redis does support persistence in the form of dumping the dataset to disk periodically or by appending each cmd to a
     disk-based log. These are excellent features and wondering whether to expand on them a little more, adding other 
     storage mediums as options, as opposed to just persisting in-memory storage. 
