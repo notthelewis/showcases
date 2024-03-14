@@ -1,10 +1,59 @@
-# Protocol
+# BOOP protocol
 
-Since I'm clearly a massochist, I want to build my own protocol for this project. I'm not going to follow the usual TLV 
-encoding that I'm familiar with. I'm going to encode data types with pre-determined lengths ahead of time. This prevents
-the need for sending one byte or more in order to specify the length of every field. Simple data types, such as integers,
-will have a known size at encode/decode time, so this information does not need to be specifed for every message. I will
-do some bit-packing and such.
+_Bidirectional.Optimal.Ordnance.Protocol_
+
+Since I'm clearly a masochist, I want to build my own protocol for this project.
+
+I'm going to encode data types with lengths pre-determined ahead of time. This prevents the need for sending one byte or
+more in order to specify the length of every field. Simple data types, such as integers, have a known size at encode /
+decode time, so this information does not need to be specifed for every message. Alongside this, this removes the need 
+for control sequences completely. 
+
+Redis states:
+> RESP is a compromise among the following considerations:
+> 
+> Simple to implement.
+> Fast to parse.
+> Human readable.
+
+BOOP's operational objectives vary considerably from RESP's. I don't care about it being human readable. The main thing 
+reading the protocol isn't going to be humans; it's going to be computers. Tools can be made to print the protocol out 
+in readable ways, if such a thing is needed. Standard UNIX tools like xxd or hexdump can work too.
+
+Removing the human readable compromise, BOOP can focus more on the implementation being simple to implement & efficient
+to encode and decode. There's also the opportunity for compression too, which could be really useful for low bandwidth
+situations, like over a congested dial-up internet connection, or low-power 2G embedded devices. This does negate the 
+usage of off-the-shelf packet inspection tools and perhaps is a bit overkill for all applications. Further research is 
+required here.
+
+# Network layer
+
+Since this is a Redis clone, the model is going to be client-server. Unlike RESP, `BOOP` will support _multiple_ 
+protocols at the network layer, natively. It will support:
+
+1) TCP
+2) UDP
+3) Unix sockets
+4) HTTP
+5) WebSockets
+
+This means that there will need to be a unified writing and reading interface, which allows each protocol to be handled
+in a cohesive manner between wildly different protocols. This can be challenging, due to the massive variance between
+each protocol's philosphy and intended use case. 
+
+Initially, I'm going to start off with the following trait:
+
+```rs
+// network/interface.rs
+pub(crate) trait NetworkLayer<ConnectionType, SendFormat, ResponseFormat> {
+    fn send_message(cnx: ConnectionType, to_send: SendFormat) -> anyhow::Result<()>;
+    fn recv_message(cnx: ConnectionType, recv_buf: ResponseFormat) -> anyhow::Result<usize>;
+}
+```
+Each transmission protocol will have a concrete implementation of the above interface. This will be separate from the 
+encode & decode steps and will purely deal with communication between client and server. The benefit of decoupling them
+is that it should be easier to swap out components as long as the interface requirement is met. It allows the same 
+encoding routine to be shared between all of the supported network components too.
 
 # Spec
 
@@ -38,16 +87,17 @@ then each data type is encoded differently.
 | map     ! 1 ! 1 ! 1 |
 |---------!---!---!---|
 ```
+
 The reason for this format is because the encode and decode implementations could be _almost_ branchless, regardless if 
 considered properly. There are a couple down sides to this approach. 
 
-I've gone for the approach of maximum entropy; if later on down the line I wanted to modify the protocol, it would likely
-mean large modifications. I'm willing to take that risk on in order to ensure that data is encoded in as small a fashion
+I've gone for the approach of maximum entropy; if later on down the line I wanted to modify the protocol, it would mean 
+large modifications. I'm willing to take that risk on in order to ensure that data is encoded in as small a fashion
 as is possible. 
 
-I'm also tempted to use some kind of compression for large strings / arrays / maps. I'm thinking of using Facebook's Zstandard,
-as there's an implementation for it in almost all languages. This should make using it on different clients quite
-easy. 
+I'm also tempted to use some kind of compression for large strings / arrays / maps. I'm thinking of using Facebook's
+`Zstandard`, as there's an implementation for it in almost all languages. This should make using it on different clients 
+quite easy. I'm not yet sold on whether the compute required warrantst the perceived benefit of compression.
 
 ## Integer
 
@@ -286,5 +336,3 @@ For example, an array containing a single u8 of value 256 would be encoded like 
 A map is a collection of key-value tuples. This is encoded in an almost identical fashion to how an Array is encoded, by
 specifying the total number of entries (key & value) that are in the map first, then by adding the data types required
 afterwards. 
-
-
