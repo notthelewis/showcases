@@ -2,6 +2,10 @@
 
 This file documents potential considerations for various parts of this project. 
 
+### Names
+
+- Name for the software itself could do with workshopping. Blewis is a bit egotistical.
+
 ### Security
 - Implementation could be vulnerable to a slow-loris attack on decode routine for maps & arrays
 - Zip bombs could be a threat if compression is used
