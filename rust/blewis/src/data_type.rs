@@ -1,25 +1,30 @@
 use bytes::Bytes;
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum DataType {
-    Integer(IntegerDataType),
+    Num(Int),
     Bool(bool),
     String(Bytes),
-    Error(ErrorDataType),
+    Error(Error),
     Array(Box<DataType>),
     Map(Box<MapDataType>),
 }
 
-pub(crate) enum IntegerDataType {
+#[derive(Debug, PartialEq)]
+pub(crate) enum Int {
     Tiny(u8),
     Medium(u32),
+    Small(u16),
     Large(u64),
-    FloatingSmall(f32),
-    FloatingLarge(f64),
+    FloatSmall(f32),
+    FloatLarge(f64),
 }
 
-pub(crate) struct ErrorDataType {
+#[derive(Debug, PartialEq)]
+pub(crate) struct Error {
     err_code: u8,
     err_msg: Bytes,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct MapDataType(DataType, DataType);
