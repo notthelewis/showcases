@@ -65,6 +65,8 @@ I'm only supporting the following data types;
 5) array
 6) map
 
+All data types are encoded MSB (Big Endian).
+
 Every encoded message is prepended with variable length meta data. The first 3 bits follow this format,
 then each data type is encoded differently.
 
@@ -109,7 +111,7 @@ I will support the following types of integer:
  - floating_small (f32)
  - floating_large (f64)
 
-We can represent this with 3 bits. 
+We can represent this with 3 bits. NOTE: Remember position starts from 7 not 0 (BE)
 
 ```
 |------------!-----------!
@@ -133,32 +135,32 @@ This gives us the nice, predictable quality that:
 >> An int's meta data always takes up 6 bits, regardless of the type of integer
 
 ```
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 0 ! 0 ! 0 | ---------> tiny integer meta data
 |---!---!---!---!---!---|
 
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 0 ! 0 ! 1 | ---------> small integer meta data
 |---!---!---!---!---!---|
 
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 0 ! 1 ! 0 | ---------> medium integer meta data
 |---!---!---!---!---!---|
 
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 1 ! 0 ! 0 | ---------> large integer meta data
 |---!---!---!---!---!---|
 
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 1 ! 1 ! 0 | ---------> floating_small integer meta data
 |---!---!---!---!---!---|
 
-  0   1   2   3   4   5
+  7   6   5   4   3   2
 |---!---!---!---!---|---|
 | 0 ! 0 ! 0 ! 1 ! 1 ! 1 | ---------> floating_large integer meta data
 |---!---!---!---!---!---|
