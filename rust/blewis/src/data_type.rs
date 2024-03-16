@@ -22,8 +22,8 @@ pub(crate) enum Int {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Error {
-    err_code: u8,
-    err_msg: Bytes,
+    pub err_code: u8,
+    pub err_msg: Bytes,
 }
 
 #[derive(Debug, PartialEq)]
