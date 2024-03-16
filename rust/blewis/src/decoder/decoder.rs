@@ -46,7 +46,6 @@ mod test {
 
         buf.put_u8(0b_0001_1100);
         buf.put_f64(-0.1234);
-
         buf.put_u8(0b_0001_1100);
         buf.put_f64(0.1234);
 
