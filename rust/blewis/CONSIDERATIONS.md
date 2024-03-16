@@ -7,7 +7,7 @@ This file documents potential considerations for various parts of this project.
 - Name for the software itself could do with workshopping. Blewis is a bit egotistical.
 
 ### Security
-- Implementation could be vulnerable to a slow-loris attack on decode routine for maps & arrays
+- Implementation could be vulnerable to a slow-loris attack on decode routine for strings, maps & arrays.
 - Zip bombs could be a threat if compression is used
 - Implementation could be vulnerable to overflow if decoding nested structures (i.e. array[array[string], string])
     - To mitigate, both encoding and decoding implementations should enforce limits on recursive, unsized elements. 
@@ -19,6 +19,9 @@ This file documents potential considerations for various parts of this project.
 - Object pooling may be a big win too
 - Could be a ton of branching logic in the decode routine
 - Some of the larger int types could encode/decode quite poorly on 32bit machines (i.e. u64, f64)
+- Array could be split into two different encoding formats. If the array is purely numerical and of the same type, a 
+  higher entropy encoding format could potentially be devised; using 3 of the padding bits to set 
+
 
 ## Libraries
 - [anyhow](https://docs.rs/anyhow/latest/anyhow/)
