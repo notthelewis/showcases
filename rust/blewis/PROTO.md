@@ -111,12 +111,14 @@ I will support the following types of integer:
  - floating_small (f32)
  - floating_large (f64)
 
-We can represent this with 3 bits. NOTE: Remember position starts from 7 not 0 (BE)
+We can represent this with 3 bits. Remember, all data is encoded MSB
 
 ```
-|------------!-----------!
-|  int type  !    pos    |
-|------------!---!---!---|
+|============!===========|
+|            !  bit pos  |
+|------------!-----------|
+|  int type  ! 2 ! 3 ! 4 |
+|============!===!===!===|
 |tiny        ! 0 ! 0 ! 0 |
 |------------!---!---!---|
 |small       ! 0 ! 0 ! 1 |
@@ -197,7 +199,7 @@ optimise our number of reads from the get-go. So even if the implementation `Rea
 the syscall: `read()` twice.
 
 And the final nail in the coffin, for me, is that we need far fewer allocations and overall operations during the parse 
-routine. When parsing the RESP3 version, the routine might look something like this:
+routine. When parsing the RESP3 version, the routine could look something like this:
 
 ```rs
 let mut read_buf: Vec<u8> = Vec::with_capacity(MAX_BULK_STRING_LEN);
@@ -288,7 +290,7 @@ a single bit. 0 == false, 1 == true. This means that we can realistically encode
 
 ```
 |===========|===================|
-| 0 ! 1 ! 2 | 3 ! 4 ! 5 ! 6 ! 7 |
+| 7 ! 6 ! 5 | 4 ! 3 ! 2 ! 1 ! 0 |
 |---!---!---|---!---!---!---!---|
 | 0 ! 0 ! 1 | 0 ! 0 | 0 | 0 | 1 |
 |-----------|---------------|---|
