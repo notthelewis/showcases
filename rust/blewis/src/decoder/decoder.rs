@@ -13,14 +13,23 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         48 => Ok(DataType::Num(Int::FloatS(buf.get_f32()))),
         56 => Ok(DataType::Num(Int::FloatL(buf.get_f64()))),
 
+        // Boolean values don't require any more data. It's just the 1 byte
         132 => Ok(DataType::Bool(true)),
         4 => Ok(DataType::Bool(false)),
 
+        // Strings are length prepended byte arrays. We use the `copy_to_bytes` function to
+        // leverage the Bytes package's shallow copy mechanism.
+        2 => {
+            let len = buf.get_u16() as usize;
+            Ok(DataType::String(buf.copy_to_bytes(len)))
+        }
         unknown => anyhow::bail!("unknown meta_data byte: {:#b}", unknown),
     }
 }
 
 mod test {
+    use std::u16;
+
     use anyhow::Context;
     use bytes::BufMut;
 
@@ -59,21 +68,70 @@ mod test {
 
         run_test(&mut buf, DataType::Num(Int::Tiny(255)), "decode u8");
         run_test(&mut buf, DataType::Num(Int::Small(0xFF00)), "decode u16");
-        run_test(&mut buf, DataType::Num(Int::Medium(0xDEADBEEF)), "decode u32");
-        run_test(&mut buf, DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)), "decode u64");
-        run_test(&mut buf, DataType::Num(Int::FloatS(-0.1234)), "decode negative f32");
-        run_test(&mut buf, DataType::Num(Int::FloatS(0.1234)), "decode positive f32");
-        run_test(&mut buf, DataType::Num(Int::FloatL(-0.1234)), "decode negative f64");
-        run_test(&mut buf, DataType::Num(Int::FloatL(0.1234)), "decode positive f32");
+        run_test(
+            &mut buf,
+            DataType::Num(Int::Medium(0xDEADBEEF)),
+            "decode u32",
+        );
+        run_test(
+            &mut buf,
+            DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
+            "decode u64",
+        );
+        run_test(
+            &mut buf,
+            DataType::Num(Int::FloatS(-0.1234)),
+            "decode negative f32",
+        );
+        run_test(
+            &mut buf,
+            DataType::Num(Int::FloatS(0.1234)),
+            "decode positive f32",
+        );
+        run_test(
+            &mut buf,
+            DataType::Num(Int::FloatL(-0.1234)),
+            "decode negative f64",
+        );
+        run_test(
+            &mut buf,
+            DataType::Num(Int::FloatL(0.1234)),
+            "decode positive f64",
+        );
     }
 
     #[test]
     fn bool_decode() {
         let mut buf = bytes::BytesMut::new();
-        buf.put_u8(0b_1_0000_100);
-        buf.put_u8(0b_0_0000_100);
+        buf.put_u8(0b_1_0000_100); // true
+        buf.put_u8(0b_0_0000_100); // false
 
-        run_test(&mut buf, DataType::Bool(true), "should decode a TRUE");
-        run_test(&mut buf, DataType::Bool(false), "should decode a FALSE");
+        run_test(&mut buf, DataType::Bool(true), "decode a TRUE");
+        run_test(&mut buf, DataType::Bool(false), "decode a FALSE");
+    }
+
+    #[test]
+    fn bytes_test() {
+        let mut buf = bytes::BytesMut::new();
+        buf.put_slice(&[0, 1, 2]);
+
+        assert_eq!(buf.get_u8(), 0);
+        assert_eq!(buf.get(..2).unwrap(), &[1, 2]);
+    }
+
+    #[test]
+    fn string_decode() {
+        let mut buf = bytes::BytesMut::new();
+        let to_encode = b"multiple\r\nlines\r\nsupported\0null bytes too";
+
+        buf.put_u8(0b_00000_010); // string type
+        buf.put_u16(to_encode.len() as u16); // length
+        buf.put_slice(to_encode);
+
+        run_test(
+            &mut buf,
+            DataType::String(bytes::Bytes::from_static(to_encode)),
+            "decode a string",
+        );
     }
 }
