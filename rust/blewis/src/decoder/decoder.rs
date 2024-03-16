@@ -50,44 +50,18 @@ mod test {
         buf.put_u8(0b_0001_1100);
         buf.put_f64(0.1234);
 
-        let expected = DataType::Num(Int::Tiny(255));
-        let received = handle_decode(&mut buf).context("decode u8").unwrap();
-        assert_eq!(expected, received);
+        let mut run_test = |expected: DataType, ctxt: &'static str| {
+            let received = handle_decode(&mut buf).context(ctxt).unwrap();
+            assert_eq!(expected, received);
+        };
 
-        let expected = DataType::Num(Int::Small(0xFF00));
-        let received = handle_decode(&mut buf).context("decode u16").unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::Medium(0xDEADBEEF));
-        let received = handle_decode(&mut buf).context("decode u32").unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::Large(0xFEEDFACEDEADBEEF));
-        let received = handle_decode(&mut buf).context("decode u64").unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::FloatSmall(-0.1234));
-        let received = handle_decode(&mut buf)
-            .context("decode f32 negative number")
-            .unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::FloatSmall(0.1234));
-        let received = handle_decode(&mut buf)
-            .context("decode f32 positive number")
-            .unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::FloatLarge(-0.1234));
-        let received = handle_decode(&mut buf)
-            .context("decode f64 negative number")
-            .unwrap();
-        assert_eq!(expected, received);
-
-        let expected = DataType::Num(Int::FloatLarge(0.1234));
-        let received = handle_decode(&mut buf)
-            .context("decode f64 positive number")
-            .unwrap();
-        assert_eq!(expected, received);
+        run_test(DataType::Num(Int::Tiny(255)), "decode u8");
+        run_test(DataType::Num(Int::Small(0xFF00)), "decode u16");
+        run_test(DataType::Num(Int::Medium(0xDEADBEEF)), "decode u32");
+        run_test(DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)), "decode u64");
+        run_test(DataType::Num(Int::FloatSmall(-0.1234)), "decode negative f32");
+        run_test(DataType::Num(Int::FloatSmall(0.1234)), "decode positive f32");
+        run_test(DataType::Num(Int::FloatLarge(-0.1234)), "decode negative f64");
+        run_test(DataType::Num(Int::FloatLarge(0.1234)), "decode negative f32");
     }
 }
