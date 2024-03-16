@@ -13,14 +13,13 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         24 => Ok(DataType::Num(Int::FloatSmall(buf.get_f32()))),
         28 => Ok(DataType::Num(Int::FloatLarge(buf.get_f64()))),
 
-        unknown => anyhow::bail!("unkown meta_data byte: {:#b}", unknown)
+        unknown => anyhow::bail!("unkown meta_data byte: {:#b}", unknown),
     }
 }
 
-
 mod test {
-    use bytes::BufMut as _;
     use anyhow::Context;
+    use bytes::BufMut as _;
 
     use super::*;
 
@@ -68,19 +67,27 @@ mod test {
         assert_eq!(expected, received);
 
         let expected = DataType::Num(Int::FloatSmall(-0.1234));
-        let received = handle_decode(&mut buf).context("decode f32 negative number").unwrap();
+        let received = handle_decode(&mut buf)
+            .context("decode f32 negative number")
+            .unwrap();
         assert_eq!(expected, received);
 
         let expected = DataType::Num(Int::FloatSmall(0.1234));
-        let received = handle_decode(&mut buf).context("decode f32 positive number").unwrap();
+        let received = handle_decode(&mut buf)
+            .context("decode f32 positive number")
+            .unwrap();
         assert_eq!(expected, received);
 
         let expected = DataType::Num(Int::FloatLarge(-0.1234));
-        let received = handle_decode(&mut buf).context("decode f64 negative number").unwrap();
+        let received = handle_decode(&mut buf)
+            .context("decode f64 negative number")
+            .unwrap();
         assert_eq!(expected, received);
 
         let expected = DataType::Num(Int::FloatLarge(0.1234));
-        let received = handle_decode(&mut buf).context("decode f64 positive number").unwrap();
+        let received = handle_decode(&mut buf)
+            .context("decode f64 positive number")
+            .unwrap();
         assert_eq!(expected, received);
     }
 }
