@@ -10,8 +10,8 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         4 => Ok(DataType::Num(Int::Small(buf.get_u16()))),
         8 => Ok(DataType::Num(Int::Medium(buf.get_u32()))),
         16 => Ok(DataType::Num(Int::Large(buf.get_u64()))),
-        24 => Ok(DataType::Num(Int::FloatSmall(buf.get_f32()))),
-        28 => Ok(DataType::Num(Int::FloatLarge(buf.get_f64()))),
+        24 => Ok(DataType::Num(Int::FloatS(buf.get_f32()))),
+        28 => Ok(DataType::Num(Int::FloatL(buf.get_f64()))),
 
         unknown => anyhow::bail!("unkown meta_data byte: {:#b}", unknown),
     }
@@ -27,8 +27,8 @@ mod test {
     fn integer_data_types_decode() {
         let mut buf = bytes::BytesMut::new();
 
-        buf.put_u8(0);
-        buf.put_u8(0xFF);
+        buf.put_u8(0); // header
+        buf.put_u8(0xFF); // u8
 
         buf.put_u8(0b_0000_0100);
         buf.put_u16(0xFF00);
@@ -59,9 +59,9 @@ mod test {
         run_test(DataType::Num(Int::Small(0xFF00)), "decode u16");
         run_test(DataType::Num(Int::Medium(0xDEADBEEF)), "decode u32");
         run_test(DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)), "decode u64");
-        run_test(DataType::Num(Int::FloatSmall(-0.1234)), "decode negative f32");
-        run_test(DataType::Num(Int::FloatSmall(0.1234)), "decode positive f32");
-        run_test(DataType::Num(Int::FloatLarge(-0.1234)), "decode negative f64");
-        run_test(DataType::Num(Int::FloatLarge(0.1234)), "decode negative f32");
+        run_test(DataType::Num(Int::FloatS(-0.1234)), "decode negative f32");
+        run_test(DataType::Num(Int::FloatS(0.1234)), "decode positive f32");
+        run_test(DataType::Num(Int::FloatL(-0.1234)), "decode negative f64");
+        run_test(DataType::Num(Int::FloatL(0.1234)), "decode negative f32");
     }
 }

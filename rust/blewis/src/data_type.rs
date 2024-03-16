@@ -16,8 +16,8 @@ pub(crate) enum Int {
     Medium(u32),
     Small(u16),
     Large(u64),
-    FloatSmall(f32),
-    FloatLarge(f64),
+    FloatS(f32),
+    FloatL(f64),
 }
 
 #[derive(Debug, PartialEq)]
