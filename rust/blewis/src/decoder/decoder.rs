@@ -62,6 +62,6 @@ mod test {
         run_test(DataType::Num(Int::FloatS(-0.1234)), "decode negative f32");
         run_test(DataType::Num(Int::FloatS(0.1234)), "decode positive f32");
         run_test(DataType::Num(Int::FloatL(-0.1234)), "decode negative f64");
-        run_test(DataType::Num(Int::FloatL(0.1234)), "decode negative f32");
+        run_test(DataType::Num(Int::FloatL(0.1234)), "decode positive f32");
     }
 }
