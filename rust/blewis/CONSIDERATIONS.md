@@ -20,7 +20,8 @@ This file documents potential considerations for various parts of this project.
 - Could be a ton of branching logic in the decode routine
 - Some of the larger int types could encode/decode quite poorly on 32bit machines (i.e. u64, f64)
 - Array could be split into two different encoding formats. If the array is purely numerical and of the same type, a 
-  higher entropy encoding format could potentially be devised; using 3 of the padding bits to set 
+  higher entropy encoding format could potentially be devised; using 3 of the padding bits to set the type of the array
+  and then the following two bytes for size. Then, each of the data messages could just be sent as they are 
 
 
 ## Libraries
