@@ -1,6 +1,4 @@
-use std::{io::Read, u16};
-
-use bytes::{Buf, BufMut, Bytes};
+use bytes::{BufMut, Bytes};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum DataType {
@@ -27,7 +25,7 @@ pub(crate) struct Error {
     pub is_server_err: bool,
     pub err_code: u8,
     // Store error message as byte fields in standard ascii (for now)
-    pub err_msg: Bytes
+    pub err_msg: Bytes,
 }
 
 impl Error {

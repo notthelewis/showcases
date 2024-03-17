@@ -44,7 +44,7 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
 
 mod test {
     use anyhow::Context;
-    use bytes::BufMut;
+    use bytes::BufMut as _;
 
     use super::*;
 
@@ -127,6 +127,7 @@ mod test {
     fn string_decode() {
         let mut buf = bytes::BytesMut::new();
         let to_encode = b"multiple\r\nlines\r\nsupported\0null bytes too";
+
         buf.put_u8(0b_00000_010); // string type
         buf.put_u16(to_encode.len() as u16); // length
         buf.put_slice(to_encode);
@@ -143,7 +144,7 @@ mod test {
         let err = crate::data_type::Error {
             is_server_err: false,
             err_code: 0xFF,
-            err_msg: bytes::Bytes::from_static(b"err")
+            err_msg: bytes::Bytes::from_static(b"err"),
         };
         let mut buf = err.encode();
         run_test(&mut buf, DataType::Error(err), "decode an error");
