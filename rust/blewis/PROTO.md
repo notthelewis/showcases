@@ -104,12 +104,12 @@ quite easy. I'm not yet sold on whether the compute required warrantst the perce
 ## Integer
 
 I will support the following types of integer:
- - tiny (u8)
- - small (u16)
- - medium (u32)
- - large (u64)
- - floating_small (f32)
- - floating_large (f64)
+ - tiny (u8)                0x00
+ - small (u16)              0x08
+ - medium (u32)             0x10
+ - large (u64)              0x20
+ - floating_small (f32)     0x30
+ - floating_large (f64)     0x38
 
 We can represent this with 3 bits. Remember, all data is encoded MSB
 
@@ -199,7 +199,7 @@ optimise our number of reads from the get-go. So even if the implementation `Rea
 the syscall: `read()` twice.
 
 And the final nail in the coffin, for me, is that we need far fewer allocations and overall operations during the parse 
-routine. When parsing the RESP3 version, the routine could look something like this:
+routine. When parsing the RESP3 version, a naive routine _could_ look something like this:
 
 ```rs
 let mut read_buf: Vec<u8> = Vec::with_capacity(MAX_BULK_STRING_LEN);
@@ -228,9 +228,10 @@ read_buf.clear();
 ```
 
 The amount of allocations required to do such a simple thing as to read a number from a buffer here are way too 
-substantial. Perhaps there's a more efficient, unsafe way of doing just that but it's not immediately obvious to me.
+substantial. There are more efficient ways of doing this but the problem with encoding integers like this is the 
+amount of unnecessary effort (and bytes) required to encode and decode numbers.
 
-The way to do this in the encoding format I'm defining would be something like this:
+The way to do this in the BOOP would be something like this:
 
 ```rs
 // NOTE: This won't quite compile, there's a couple things need changing- specifically around the bitshifting etc
@@ -240,10 +241,10 @@ reader
     .context("should read meta data")?;
 
 // Get first 6 bits
-let meta_data: u8 = &read_buf[..1] & 0b_111_111__00;
+let meta_data: u8 = &read_buf[..1];
 match meta_data {
     // If we're handling a u32
-    0b_000_010 => {
+    0x10 => {
         reader
             .read_exact(4)
             .context("should read 4 bytes")?;
@@ -253,8 +254,8 @@ match meta_data {
 }
 ```
 
-Now, in practice there would be some things done differently. That's not even tested code. I'm almost positive that the
-meta_data slice and substant & operation won't actually work like that. That being said, we can see that there are 
+Now, in practice there would be a lot of things done differently. That's not even tested code. I'm almost positive that 
+the meta_data slice and substant & operation won't actually work like that. That being said, we can see that there are 
 substantially fewer allocations made than the equivalent RESP3 parse routine. Not counting any allocations occuring at 
 the buffered reader, we can see that we allocate:
  1) the vector itself upon the first read call (stack first then heap on push)
@@ -329,7 +330,7 @@ For example, an array containing a single u8 of value 256 would be encoded like 
 ```
             |     end of byte 0 |                 end of byte 1 |                 end of byte 2 |                 end of byte 3 |                 end of byte 4 |
 |===!===!===|---!---!---!---!---|---!---!---|---!---!---!---!---!---!---!---|---!---!---!---!---|---!---!---|---!---!---!---!---|---!---!---|---!---!---!---!---| 
-| 1 ! 1 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 | 0 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 ! 0 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 1 | 0 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 | 1 ! 1 ! 1 | 1 ! 1 ! 1 ! 1 ! 1 |
+| 1 ! 1 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 | 1 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 ! 0 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 | 0 ! 0 ! 0 | 0 ! 0 ! 0 ! 0 ! 0 | 1 ! 1 ! 1 | 1 ! 1 ! 1 ! 1 ! 1 |
 |===!===!===!---!---!---!---!---|---!---!---!---!---!---!---!---|---!---!---!---!---!---!---!---|---!---!---!---!---!---!---!---|---!---!---!---!---!---!---!---|
 |   array   |  <-- padding -->  |                         length (1)                            |   u8                          |   value(256)                  |
 
