@@ -23,13 +23,26 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
             let len = buf.get_u16() as usize;
             Ok(DataType::String(buf.copy_to_bytes(len)))
         }
+
+        6 => {
+            let is_server_err = buf.get_u8() != 0;
+            let err_code = buf.get_u8();
+            let err_len = buf.get_u16() as usize;
+            println!("{err_len}");
+            let err_msg = buf.copy_to_bytes(err_len);
+
+            Ok(DataType::Error(crate::data_type::Error {
+                is_server_err,
+                err_code,
+                err_msg,
+            }))
+        }
+
         unknown => anyhow::bail!("unknown meta_data byte: {:#b}", unknown),
     }
 }
 
 mod test {
-    use std::u16;
-
     use anyhow::Context;
     use bytes::BufMut;
 
@@ -111,19 +124,9 @@ mod test {
     }
 
     #[test]
-    fn bytes_test() {
-        let mut buf = bytes::BytesMut::new();
-        buf.put_slice(&[0, 1, 2]);
-
-        assert_eq!(buf.get_u8(), 0);
-        assert_eq!(buf.get(..2).unwrap(), &[1, 2]);
-    }
-
-    #[test]
     fn string_decode() {
         let mut buf = bytes::BytesMut::new();
         let to_encode = b"multiple\r\nlines\r\nsupported\0null bytes too";
-
         buf.put_u8(0b_00000_010); // string type
         buf.put_u16(to_encode.len() as u16); // length
         buf.put_slice(to_encode);
@@ -133,5 +136,16 @@ mod test {
             DataType::String(bytes::Bytes::from_static(to_encode)),
             "decode a string",
         );
+    }
+
+    #[test]
+    fn error_decode() {
+        let err = crate::data_type::Error {
+            is_server_err: false,
+            err_code: 0xFF,
+            err_msg: bytes::Bytes::from_static(b"err")
+        };
+        let mut buf = err.encode();
+        run_test(&mut buf, DataType::Error(err), "decode an error");
     }
 }
