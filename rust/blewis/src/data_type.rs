@@ -6,8 +6,8 @@ pub(crate) enum DataType {
     Bool(bool),
     String(Bytes),
     Error(Error),
-    Array(Box<DataType>),
-    Map(Box<MapDataType>),
+    Array(Vec<DataType>),
+    Map(Vec<MapDataType>),
 }
 
 #[derive(Debug, PartialEq)]
