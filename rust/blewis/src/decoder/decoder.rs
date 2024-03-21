@@ -5,31 +5,78 @@ use ordered_float::OrderedFloat;
 use crate::data_type::{DataType, Int, MapEntry};
 
 pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
-    // TODO: Better error handling
+    // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
+    if buf.len() < 1 {
+        anyhow::bail!("unable to read meta_data byte from buffer as length is too small")
+    }
+
     match buf.get_u8() {
         // NOTE: All the get_N functions read in BIG ENDIAN order
-        0 => Ok(DataType::Num(Int::Tiny(buf.get_u8()))),
-        8 => Ok(DataType::Num(Int::Small(buf.get_u16()))),
-        16 => Ok(DataType::Num(Int::Medium(buf.get_u32()))),
-        32 => Ok(DataType::Num(Int::Large(buf.get_u64()))),
-        48 => Ok(DataType::Num(Int::FloatS(OrderedFloat(buf.get_f32())))),
-        56 => Ok(DataType::Num(Int::FloatL(OrderedFloat(buf.get_f64())))),
+        0 => {
+            if buf.len() < 1 {
+                anyhow::bail!("unable to decode u8 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::Tiny(buf.get_u8())))
+        }
+        8 => {
+            if buf.len() < 2 {
+                anyhow::bail!("unable to decode u16 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::Small(buf.get_u16())))
+        }
+        16 => {
+            if buf.len() < 4 {
+                anyhow::bail!("unable to decode u32 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::Medium(buf.get_u32())))
+        }
+        32 => {
+            if buf.len() < 8 {
+                anyhow::bail!("unable to decode u64 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::Large(buf.get_u64())))
+        }
+        48 => {
+            if buf.len() < 4 {
+                anyhow::bail!("unable to decode f32 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::FloatS(OrderedFloat(buf.get_f32()))))
+        }
+        56 => {
+            if buf.len() < 8 {
+                anyhow::bail!("unable to decode f64 from buf as length is too small")
+            }
+            Ok(DataType::Num(Int::FloatL(OrderedFloat(buf.get_f64()))))
+        }
 
-        // Boolean values don't require any more data. It's just the 1 byte
+        // NOTE: Boolean values don't require any more data. It's just the 1 byte we already read
         132 => Ok(DataType::Bool(true)),
         4 => Ok(DataType::Bool(false)),
 
         // Strings are length prepended byte arrays. We use the `copy_to_bytes` function to
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
         2 => {
+            if buf.len() < 2 {
+                anyhow::bail!("unable to decode string header from buf as length is too small")
+            }
             let len = buf.get_u16() as usize;
+            if buf.len() < len {
+                anyhow::bail!("unable to decode {len} string bytes from buf as buf is too small")
+            }
             Ok(DataType::String(buf.copy_to_bytes(len)))
         }
 
+        // Error
         6 => {
+            if buf.len() < 4 {
+                anyhow::bail!("unable to decode error header from buf as length is too small")
+            }
             let is_server_err = buf.get_u8() != 0;
             let err_code = buf.get_u8();
             let err_len = buf.get_u16() as usize;
+            if buf.len() < err_len {
+                anyhow::bail!("unable to decode error message from buf as length is too small")
+            }
             let err_msg = buf.copy_to_bytes(err_len);
             Ok(DataType::Error(crate::data_type::Error {
                 is_server_err,
@@ -40,16 +87,19 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
 
         // Array
         3 => {
+            if buf.len() < 2 {
+                anyhow::bail!("unable to decode array header from buf as length is too small")
+            }
             let element_length = buf.get_u16();
             let mut index = 0;
             let mut data: Vec<DataType> = Vec::with_capacity(element_length as usize);
 
+            // TODO: Add recursion depth check
             while index < element_length {
                 let result = handle_decode(buf);
                 if result.is_err() {
                     return result
                         .with_context(|| format!("array decode failed on element: {}", index));
-
                 }
                 data.push(result.unwrap());
                 index += 1;
@@ -60,27 +110,30 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
 
         // Map
         7 => {
+            if buf.len() < 2 {
+                anyhow::bail!("unable to decode map header from buf as length is too small")
+            }
             let element_length = buf.get_u16();
             let mut index = 0;
             let mut arr: Vec<MapEntry> = Vec::with_capacity(element_length as usize);
-            
+
+            // TODO: Add recursion depth check
             while index < element_length {
                 let key = handle_decode(buf);
                 if key.is_err() {
-                    return key
-                        .with_context(|| format!("map decode failed on KEY at element: {}", index));
+                    return key.with_context(|| {
+                        format!("map decode failed on KEY at element: {}", index)
+                    });
                 }
                 let val = handle_decode(buf);
                 if val.is_err() {
-                    return val
-                        .with_context(|| format!("map decode failed on VALUE at element: {}", index));
+                    return val.with_context(|| {
+                        format!("map decode failed on VALUE at element: {}", index)
+                    });
                 }
                 let key = key.unwrap();
                 let val = val.unwrap();
-                arr.push(MapEntry{
-                    key,
-                    val
-                });
+                arr.push(MapEntry { key, val });
                 index += 1;
             }
 
@@ -91,11 +144,12 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
     }
 }
 
+// TEST
 mod test {
+    #![allow(unused_imports)]
+    use super::*;
     use anyhow::Context;
     use bytes::BufMut;
-
-    use super::*;
 
     fn _run_test(buf: &mut bytes::BytesMut, expected: DataType, ctxt: &'static str) {
         let received = handle_decode(buf).context(ctxt).unwrap();
@@ -339,7 +393,7 @@ mod test {
         buf.put_f32(-0.1234);
         buf.put_u8(0b_00_110_000);
         buf.put_f32(-0.1234);
-        
+
         // TYPE = FLOATING_L+
         buf.put_u8(0b_00_111_000);
         buf.put_f64(0.1234);
@@ -351,7 +405,7 @@ mod test {
         buf.put_u8(0b_00_111_000);
         buf.put_f64(-0.1234);
 
-        // TYPE = BOOL 
+        // TYPE = BOOL
         buf.put_u8(0b_1_0000_100); // True
         buf.put_u8(0b_0_0000_100); // False
 
@@ -373,48 +427,48 @@ mod test {
         buf.put(err_to_encode.encode());
         buf.put(err_to_encode.encode());
 
-        let expected :Vec<MapEntry> = vec![
-            MapEntry{
+        let expected: Vec<MapEntry> = vec![
+            MapEntry {
                 key: DataType::Num(Int::Tiny(0xFF)),
-                val: DataType::Num(Int::Tiny(0xFF))
+                val: DataType::Num(Int::Tiny(0xFF)),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::Small(0xFF00)),
-                val: DataType::Num(Int::Small(0xFF00))
+                val: DataType::Num(Int::Small(0xFF00)),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::Medium(0xDEADBEEF)),
                 val: DataType::Num(Int::Medium(0xDEADBEEF)),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
-                val: DataType::Num(Int::Large(0xFEEDFACEDEADBEEF))
+                val: DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::FloatS(OrderedFloat(0.1234))),
-                val: DataType::Num(Int::FloatS(OrderedFloat(0.1234))) 
+                val: DataType::Num(Int::FloatS(OrderedFloat(0.1234))),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::FloatS(OrderedFloat(-0.1234))),
-                val: DataType::Num(Int::FloatS(OrderedFloat(-0.1234))) 
+                val: DataType::Num(Int::FloatS(OrderedFloat(-0.1234))),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::FloatL(OrderedFloat(0.1234))),
-                val: DataType::Num(Int::FloatL(OrderedFloat(0.1234))) 
+                val: DataType::Num(Int::FloatL(OrderedFloat(0.1234))),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Num(Int::FloatL(OrderedFloat(-0.1234))),
-                val: DataType::Num(Int::FloatL(OrderedFloat(-0.1234))) 
+                val: DataType::Num(Int::FloatL(OrderedFloat(-0.1234))),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Bool(true),
-                val: DataType::Bool(false), 
+                val: DataType::Bool(false),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::String(bytes::Bytes::from_static(string_to_encode)),
-                val: DataType::String(bytes::Bytes::from_static(string_to_encode)), 
+                val: DataType::String(bytes::Bytes::from_static(string_to_encode)),
             },
-            MapEntry{
+            MapEntry {
                 key: DataType::Error(err_to_encode.clone()),
                 val: DataType::Error(err_to_encode.clone()),
             },
