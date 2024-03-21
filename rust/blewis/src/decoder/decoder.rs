@@ -92,14 +92,12 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
 }
 
 mod test {
-    use std::iter::Map;
-
     use anyhow::Context;
     use bytes::BufMut;
 
     use super::*;
 
-    fn run_test(buf: &mut bytes::BytesMut, expected: DataType, ctxt: &'static str) {
+    fn _run_test(buf: &mut bytes::BytesMut, expected: DataType, ctxt: &'static str) {
         let received = handle_decode(buf).context(ctxt).unwrap();
         println!("{:?}", received);
         assert_eq!(expected, received);
@@ -131,34 +129,34 @@ mod test {
         buf.put_u8(0b_00_111_000);
         buf.put_f64(0.1234);
 
-        run_test(&mut buf, DataType::Num(Int::Tiny(255)), "decode u8");
-        run_test(&mut buf, DataType::Num(Int::Small(0xFF00)), "decode u16");
-        run_test(
+        _run_test(&mut buf, DataType::Num(Int::Tiny(255)), "decode u8");
+        _run_test(&mut buf, DataType::Num(Int::Small(0xFF00)), "decode u16");
+        _run_test(
             &mut buf,
             DataType::Num(Int::Medium(0xDEADBEEF)),
             "decode u32",
         );
-        run_test(
+        _run_test(
             &mut buf,
             DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
             "decode u64",
         );
-        run_test(
+        _run_test(
             &mut buf,
             DataType::Num(Int::FloatS(OrderedFloat(-0.1234))),
             "decode negative f32",
         );
-        run_test(
+        _run_test(
             &mut buf,
             DataType::Num(Int::FloatS(OrderedFloat(0.1234))),
             "decode positive f32",
         );
-        run_test(
+        _run_test(
             &mut buf,
             DataType::Num(Int::FloatL(OrderedFloat(-0.1234))),
             "decode negative f64",
         );
-        run_test(
+        _run_test(
             &mut buf,
             DataType::Num(Int::FloatL(OrderedFloat(0.1234))),
             "decode positive f64",
@@ -171,8 +169,8 @@ mod test {
         buf.put_u8(0b_1_0000_100); // true
         buf.put_u8(0b_0_0000_100); // false
 
-        run_test(&mut buf, DataType::Bool(true), "decode a TRUE");
-        run_test(&mut buf, DataType::Bool(false), "decode a FALSE");
+        _run_test(&mut buf, DataType::Bool(true), "decode a TRUE");
+        _run_test(&mut buf, DataType::Bool(false), "decode a FALSE");
     }
 
     #[test]
@@ -184,7 +182,7 @@ mod test {
         buf.put_u16(to_encode.len() as u16); // length
         buf.put_slice(to_encode);
 
-        run_test(
+        _run_test(
             &mut buf,
             DataType::String(bytes::Bytes::from_static(to_encode)),
             "decode a string",
@@ -199,7 +197,7 @@ mod test {
             err_msg: bytes::Bytes::from_static(b"err"),
         };
         let mut buf = err.encode();
-        run_test(&mut buf, DataType::Error(err), "decode an error");
+        _run_test(&mut buf, DataType::Error(err), "decode an error");
     }
 
     #[test]
@@ -264,7 +262,7 @@ mod test {
             DataType::Error(err_to_encode),
         ];
 
-        run_test(&mut buf, DataType::Array(expected), "array decode");
+        _run_test(&mut buf, DataType::Array(expected), "array decode");
     }
 
     #[test]
@@ -297,7 +295,7 @@ mod test {
             DataType::Bool(true),
         ]);
 
-        run_test(&mut buf, expected, "array decode nested array");
+        _run_test(&mut buf, expected, "array decode nested array");
     }
 
     #[test]
@@ -422,6 +420,6 @@ mod test {
             },
         ];
 
-        run_test(&mut buf, DataType::Map(expected), "map decode");
+        _run_test(&mut buf, DataType::Map(expected), "map decode");
     }
 }
