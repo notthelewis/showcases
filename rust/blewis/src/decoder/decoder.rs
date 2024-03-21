@@ -2,49 +2,49 @@ use anyhow::{Context, Ok};
 use bytes::Buf;
 use ordered_float::OrderedFloat;
 
-use crate::data_type::{DataType, Int, MapEntry};
+use crate::{data_type::{DataType, Int, MapEntry}, errors::DecodeError};
 
 pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
     if buf.len() < 1 {
-        anyhow::bail!("unable to read meta_data byte from buffer as length is too small")
+        anyhow::bail!(DecodeError::BufTooShortError("initial meta data byte"))
     }
 
     match buf.get_u8() {
         // NOTE: All the get_N functions read in BIG ENDIAN order
         0 => {
             if buf.len() < 1 {
-                anyhow::bail!("unable to decode u8 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("u8"))
             }
             Ok(DataType::Num(Int::Tiny(buf.get_u8())))
         }
         8 => {
             if buf.len() < 2 {
-                anyhow::bail!("unable to decode u16 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("u16"))
             }
             Ok(DataType::Num(Int::Small(buf.get_u16())))
         }
         16 => {
             if buf.len() < 4 {
-                anyhow::bail!("unable to decode u32 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("u32"))
             }
             Ok(DataType::Num(Int::Medium(buf.get_u32())))
         }
         32 => {
             if buf.len() < 8 {
-                anyhow::bail!("unable to decode u64 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("u64"))
             }
             Ok(DataType::Num(Int::Large(buf.get_u64())))
         }
         48 => {
             if buf.len() < 4 {
-                anyhow::bail!("unable to decode f32 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("f32"))
             }
             Ok(DataType::Num(Int::FloatS(OrderedFloat(buf.get_f32()))))
         }
         56 => {
             if buf.len() < 8 {
-                anyhow::bail!("unable to decode f64 from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("f64"))
             }
             Ok(DataType::Num(Int::FloatL(OrderedFloat(buf.get_f64()))))
         }
@@ -57,11 +57,11 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
         2 => {
             if buf.len() < 2 {
-                anyhow::bail!("unable to decode string header from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("string header"))
             }
             let len = buf.get_u16() as usize;
             if buf.len() < len {
-                anyhow::bail!("unable to decode {len} string bytes from buf as buf is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("string contents"))
             }
             Ok(DataType::String(buf.copy_to_bytes(len)))
         }
@@ -69,13 +69,13 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // Error
         6 => {
             if buf.len() < 4 {
-                anyhow::bail!("unable to decode error header from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("error header"))
             }
             let is_server_err = buf.get_u8() != 0;
             let err_code = buf.get_u8();
             let err_len = buf.get_u16() as usize;
             if buf.len() < err_len {
-                anyhow::bail!("unable to decode error message from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("error value"))
             }
             let err_msg = buf.copy_to_bytes(err_len);
             Ok(DataType::Error(crate::data_type::Error {
@@ -88,12 +88,12 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // Array
         3 => {
             if buf.len() < 2 {
-                anyhow::bail!("unable to decode array header from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("array header"))
             }
             let element_length = buf.get_u16();
             let mut index = 0;
             let mut data: Vec<DataType> = Vec::with_capacity(element_length as usize);
-
+            
             // TODO: Add recursion depth check
             while index < element_length {
                 let result = handle_decode(buf);
@@ -111,8 +111,9 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // Map
         7 => {
             if buf.len() < 2 {
-                anyhow::bail!("unable to decode map header from buf as length is too small")
+                anyhow::bail!(DecodeError::BufTooShortError("map header"))
             }
+
             let element_length = buf.get_u16();
             let mut index = 0;
             let mut arr: Vec<MapEntry> = Vec::with_capacity(element_length as usize);
@@ -140,7 +141,7 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
             Ok(DataType::Map(arr))
         }
 
-        unknown => anyhow::bail!("unknown meta_data byte: {:#b}", unknown),
+        unknown => Err(anyhow::anyhow!(DecodeError::UnknownMetaByte(unknown))),
     }
 }
 
