@@ -50,7 +50,6 @@ impl Error {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct MapEntry {
-   pub key: DataType,
-   pub val: DataType
+    pub key: DataType,
+    pub val: DataType,
 }
-
