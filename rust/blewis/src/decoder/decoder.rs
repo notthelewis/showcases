@@ -258,11 +258,7 @@ mod test {
             DataType::Error(err_to_encode),
         ];
 
-        _run_test(
-            &mut buf,
-            BoopArray::new(expected),
-            "array decode",
-        );
+        _run_test(&mut buf, BoopArray::new(expected), "array decode");
     }
 
     #[test]
@@ -291,10 +287,7 @@ mod test {
         }
 
         let expected = BoopArray::new(vec![
-            BoopArray::new(vec![
-                BoopBool::new(true),
-                BoopBool::new(false),
-            ]),
+            BoopArray::new(vec![BoopBool::new(true), BoopBool::new(false)]),
             BoopBool::new(true),
         ]);
 
