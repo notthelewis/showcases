@@ -16,15 +16,23 @@ Redis states:
 > Fast to parse.
 > Human readable.
 
-BOOP's operational objectives vary considerably from RESP's. I don't care about it being human readable. The main thing 
-reading the protocol isn't going to be humans; it's going to be computers. Tools can be made to print the protocol out 
-in readable ways, if such a thing is needed. Standard UNIX tools like xxd or hexdump can work too.
+`BOOP`'s operational objectives vary considerably from `RESP`'s. I don't care about it being human readable. The main 
+thing reading the protocol isn't going to be humans; it's going to be computers. Tools can be made to print the protocol 
+out in readable ways, if such a thing is needed. Standard UNIX tools like xxd or hexdump can work too.
 
-Removing the human readable compromise, BOOP can focus more on the implementation being simple to implement & efficient
-to encode and decode. There's also the opportunity for compression too, which could be really useful for low bandwidth
-situations, like over a congested dial-up internet connection, or low-power 2G embedded devices. This does negate the 
-usage of off-the-shelf packet inspection tools and perhaps is a bit overkill for all applications. Further research is 
-required here.
+Removing the human readable compromise, `BOOP` can focus more on the implementation being simple(ish) to implement & 
+efficient to encode and decode. I've gone for the approach of maximum entropy. If, later on down the line I wanted to
+modify the protocol, it would mean large modifications. I'm willing to take that risk on in order to ensure that data is
+encoded in as little space as possible. This is because I'm aiming to make this protocol useful in low bandwidth scenarios.
+
+I'm tempted to use some kind of compression for large strings / arrays, which could be really useful for low
+bandwidth situations (which is what I'm targetting), like a congested dial-up internet connection, or low-power 2G
+embedded devices. 
+
+If I do use compression, I'm thinking of using Facebook's `Zstandard`, as it is efficient to encode & decode and provides
+truly excellent entropy. They also claim to have excellent small data compression too... which might be useful. I'm not 
+yet sold on whether the compute required warrants the perceived benefit of compression, as the time taken to compress, 
+encode, decompress and decode might negate the perceived benefits of a smaller format.
 
 # Network layer
 
@@ -63,7 +71,6 @@ I'm only supporting the following data types;
 3) string
 4) error
 5) array
-6) map
 
 All data types are encoded MSB (Big Endian).
 
@@ -86,20 +93,7 @@ then each data type is encoded differently.
 |---------!---!---!---|
 | array   ! 1 ! 1 ! 0 |
 |---------!---!---!---|
-| map     ! 1 ! 1 ! 1 |
-|---------!---!---!---|
 ```
-
-The reason for this format is because the encode and decode implementations could be _almost_ branchless, regardless if 
-considered properly. There are a couple down sides to this approach. 
-
-I've gone for the approach of maximum entropy; if later on down the line I wanted to modify the protocol, it would mean 
-large modifications. I'm willing to take that risk on in order to ensure that data is encoded in as small a fashion
-as is possible. 
-
-I'm also tempted to use some kind of compression for large strings / arrays / maps. I'm thinking of using Facebook's
-`Zstandard`, as there's an implementation for it in almost all languages. This should make using it on different clients 
-quite easy. I'm not yet sold on whether the compute required warrantst the perceived benefit of compression.
 
 ## Integer
 
@@ -196,7 +190,7 @@ system calls to `read()`. If we were reading in the traditional sense yes, our m
 However, we're using ✨Rust✨, which is a modern language who, along with all other modern languages, has the concept of 
 a BufferedReader baked right in. So, we're not going to just be reading byte-by-byte. Our buffered reader is going to 
 optimise our number of reads from the get-go. So even if the implementation `Read`s twice, it doesn't necessarily call
-the syscall: `read()` twice.
+the `read()` syscall twice.
 
 And the final nail in the coffin, for me, is that we need far fewer allocations and overall operations during the parse 
 routine. When parsing the RESP3 version, a naive routine _could_ look something like this:
@@ -228,8 +222,9 @@ read_buf.clear();
 ```
 
 The amount of allocations required to do such a simple thing as to read a number from a buffer here are way too 
-substantial. There are more efficient ways of doing this but the problem with encoding integers like this is the 
-amount of unnecessary effort (and bytes) required to encode and decode numbers.
+substantial. There are more efficient ways of doing this (especially if you don't mind unsafe) but the problem with 
+encoding integers like this is the amount of unnecessary allocations and overalll space required to encode and decode 
+numbers.
 
 The way to do this in the BOOP would be something like this:
 
@@ -254,30 +249,28 @@ match meta_data {
 }
 ```
 
-Now, in practice there would be a lot of things done differently. That's not even tested code. I'm almost positive that 
-the meta_data slice and substant & operation won't actually work like that. That being said, we can see that there are 
-substantially fewer allocations made than the equivalent RESP3 parse routine. Not counting any allocations occuring at 
-the buffered reader, we can see that we allocate:
+Now, in practice there would be a lot of things done differently. That being said, we can see that there are substantially 
+fewer allocations made than the equivalent RESP3 parse routine. Not counting any allocations occuring at the buffered 
+reader, we can see that we allocate:
  1) the vector itself upon the first read call (stack first then heap on push)
- 2) the meta_data variable (a u8), which adds branching logic, increasing the chance of branch misprediction
+ 2) the meta_data variable (a u8), which does add branching logic, increasing the chance of branch misprediction
  3) the int_u32 variable. 
 
-This is 3 allocations, two of which are stack allocated (meta_data & int_u32) and the heap allocations would occur in the
-inverse case anyhow. 
+This is 3 allocations, two of which are stack allocated (meta_data & int_u32) and the heap allocation for the read 
+buffer.
 
 The read routine for the RESP encoded u32 requires:
  1) the read_buf vector upon the first read call (stack first then heap on push)
  2) two stack allocations (and copies) for the two u8 values that should contain \r\n and subsequently this introduces 
     four branches, which adds three more chances for branch misprediction
- 3) a heap allocated string, with another branch added if the string is not valid utf-8
+ 3) a heap allocated string, with another branch added for when the string is not valid utf-8
  4) however many allocations the standard `String::parse::<usize>()` function makes
  5) finally, a stack allocated u32
 
 In conclusion, there are far fewer allocations required with this proposed protocol, and most of the allocations made 
 reside on the stack, which is far more efficient than going through the allocator to store short-lived, tiny data on the
 heap. Granted, there may be a better way of doing the first method, though it's still not going to get close to data which
-is encoded in the format that the language is already expecting.
-
+is encoded in the format identical to what most sane programming languages already expect.
 
 ### Floating point integers
 Floating point will be encoded as IEEE-754, with single precision for f32 and double precision for f64. I won't put many
@@ -287,7 +280,7 @@ standard with many resources readily available online.
 ## Bool
 
 A bool is the easiest data type to implement. Since there's only ever 2 states, we can encode all of this state in just 
-a single bit. 0 == false, 1 == true. This means that we can realistically encode a bool in just 1 byte.
+a single bit. 0 == false, 1 == true. This means that we can realistically encode a bool within the meta_data byte.
 
 ```
 |===========|===================|
@@ -301,14 +294,15 @@ a single bit. 0 == false, 1 == true. This means that we can realistically encode
 
 This is a highly efficient encoding. Not least of all because it's just one byte but also because the decoding of it is 
 extremely simple to implement and efficient to execute. It can be achieved one or two bitwise `AND` operations, 
-implementation dependent.
+implementation dependent. Or, we could just use it within a big match or switch-case block.
 
 ## String
 
 Strings are just going to be utf-8 encoded byte arrays, with a length prepended in a u16 directly after the meta data.
-This means that the maximum string length is 65535. This means that every string that is encoded is N+2 bytes, where N
-is the number of UTF8 encoded bytes the string contains. Of course, this isn't the entropy if we're only encoding tiny 
-strings but the trade off is well worth it, as two bytes is practically zero. 
+This means that the maximum string length is 65535. This means that every string that is encoded is N+2 bytes 
+(exc meta_data), where N is the number of UTF8 encoded bytes the string contains. Of course, this isn't good entropy 
+if we're only encoding tiny strings but the trade off is well worth it, as two bytes is practically zero when encoding
+Hamlet.
 
 ## Error
 
@@ -335,9 +329,3 @@ For example, an array containing a single u8 of value 256 would be encoded like 
 |   array   |  <-- padding -->  |                         length (1)                            |   u8                          |   value(256)                  |
 
 ```
-
-## Map
-
-A map is a collection of key-value tuples. This is encoded in an almost identical fashion to how an Array is encoded, by
-specifying the total number of entries (key & value) that are in the map first, then by adding the data types required
-afterwards. 
