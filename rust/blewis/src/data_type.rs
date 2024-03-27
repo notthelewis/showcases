@@ -1,9 +1,7 @@
-use std::{any::Any, marker::PhantomData, u64};
-
 use bytes::{BufMut, Bytes};
 use ordered_float::OrderedFloat;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum DataType {
     Num(Int),
     Bool(BoopBool),
@@ -12,7 +10,7 @@ pub(crate) enum DataType {
     Array(BoopArray),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) enum Int {
     Tiny(u8),
     Medium(u32),
@@ -43,7 +41,7 @@ impl Int {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct BoopBool(pub bool);
 
 impl BoopBool {
@@ -52,7 +50,7 @@ impl BoopBool {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct BoopString(pub Bytes);
 
 impl BoopString {
@@ -104,7 +102,7 @@ impl BoopError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct BoopArray(pub Vec<DataType>);
 
 impl BoopArray {
