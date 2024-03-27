@@ -7,7 +7,7 @@ This file documents potential considerations for various parts of this project.
 - Name for the software itself could do with workshopping. Blewis is a bit egotistical.
 
 ### Security
-- Implementation could be vulnerable to a slow-loris attack on decode routine for strings, maps & arrays.
+- Implementation could be vulnerable to a slow-loris attack on decode routine for strings & arrays.
 - Zip bombs could be a threat if compression is used
 - Implementation could be vulnerable to overflow if decoding nested structures (i.e. array[array[string], string])
     - To mitigate, both encoding and decoding implementations should enforce limits on recursive, unsized elements. 
