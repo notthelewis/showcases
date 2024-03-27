@@ -69,12 +69,20 @@ pub(crate) struct BoopError {
 }
 
 impl BoopError {
-    pub fn new(is_server_err: bool, err_code: u8, err_msg: Bytes) -> DataType {
-        DataType::Error(Self {
+    pub fn new_unwrapped(is_server_err: bool, err_code: u8, err_msg: Bytes) -> Self {
+        Self {
             is_server_err,
             err_code,
             err_msg,
-        })
+        }
+    }
+
+    pub fn wrap(self) -> DataType {
+        DataType::Error(self)
+    }
+
+    pub fn new(is_server_err: bool, err_code: u8, err_msg: Bytes) -> DataType {
+        BoopError::wrap(BoopError::new_unwrapped(is_server_err, err_code, err_msg))
     }
 
     pub fn encode(&self) -> bytes::BytesMut {

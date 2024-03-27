@@ -236,11 +236,8 @@ mod test {
         buf.put_u16(string_to_encode.len() as u16);
         buf.put_slice(string_to_encode);
 
-        let err_to_encode = crate::data_type::BoopError {
-            is_server_err: false,
-            err_code: 0x00,
-            err_msg: bytes::Bytes::from_static(b"some message"),
-        };
+        let err_to_encode =
+            BoopError::new_unwrapped(false, 0x00, Bytes::from_static(b"some message"));
         buf.put(err_to_encode.encode());
 
         let expected: Vec<DataType> = vec![
@@ -255,7 +252,7 @@ mod test {
             BoopBool::new(true),
             BoopBool::new(false),
             BoopString::new(Bytes::from_static(string_to_encode)),
-            DataType::Error(err_to_encode),
+            BoopError::wrap(err_to_encode),
         ];
 
         _run_test(&mut buf, BoopArray::new(expected), "array decode");
