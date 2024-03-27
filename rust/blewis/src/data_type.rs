@@ -1,13 +1,15 @@
+use std::{any::Any, marker::PhantomData, u64};
+
 use bytes::{BufMut, Bytes};
 use ordered_float::OrderedFloat;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DataType {
     Num(Int),
-    Bool(bool),
-    String(Bytes),
-    Error(Error),
-    Array(Vec<DataType>),
+    Bool(BoopBool),
+    String(BoopString),
+    Error(BoopError),
+    Array(BoopArray),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -20,14 +22,61 @@ pub(crate) enum Int {
     FloatL(OrderedFloat<f64>),
 }
 
+impl Int {
+    pub fn new_u8(v: u8) -> DataType {
+        DataType::Num(Int::Tiny(v))
+    }
+    pub fn new_u16(v: u16) -> DataType {
+        DataType::Num(Int::Small(v))
+    }
+    pub fn new_u32(v: u32) -> DataType {
+        DataType::Num(Int::Medium(v))
+    }
+    pub fn new_u64(v: u64) -> DataType {
+        DataType::Num(Int::Large(v))
+    }
+    pub fn new_f32(v: f32) -> DataType {
+        DataType::Num(Int::FloatS(OrderedFloat(v)))
+    }
+    pub fn new_f64(v: f64) -> DataType {
+        DataType::Num(Int::FloatL(OrderedFloat(v)))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(crate) struct BoopBool(pub bool);
+
+impl BoopBool {
+    pub fn new(v: bool) -> DataType {
+        DataType::Bool(Self(v))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(crate) struct BoopString(pub Bytes);
+
+impl BoopString {
+    pub fn new(v: Bytes) -> DataType {
+        DataType::String(BoopString(v))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub(crate) struct Error {
+pub(crate) struct BoopError {
     pub is_server_err: bool,
     pub err_code: u8,
     pub err_msg: Bytes,
 }
 
-impl Error {
+impl BoopError {
+    pub fn new(is_server_err: bool, err_code: u8, err_msg: Bytes) -> DataType {
+        DataType::Error(Self {
+            is_server_err,
+            err_code,
+            err_msg,
+        })
+    }
+
     pub fn encode(&self) -> bytes::BytesMut {
         let mut to_return = bytes::BytesMut::with_capacity(self.err_msg.len() + 5);
 
@@ -44,5 +93,14 @@ impl Error {
         to_return.put(self.err_msg.as_ref());
 
         to_return
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(crate) struct BoopArray(pub Vec<DataType>);
+
+impl BoopArray {
+    pub fn new(data: Vec<DataType>) -> DataType {
+        DataType::Array(Self(data))
     }
 }
