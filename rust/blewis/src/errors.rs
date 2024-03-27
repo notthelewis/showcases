@@ -6,5 +6,5 @@ pub enum DecodeError {
     BufTooShortError(&'static str),
 
     #[error("Unable to decode buffer due to unknown meta byte: {0}")]
-    UnknownMetaByte(u8)
+    UnknownMetaByte(u8),
 }
