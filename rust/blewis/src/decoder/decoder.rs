@@ -2,7 +2,7 @@ use anyhow::{Context, Ok};
 use bytes::Buf;
 use ordered_float::OrderedFloat;
 
-use crate::{data_type::{DataType, Int, MapEntry}, errors::DecodeError};
+use crate::{data_type::{DataType, Int}, errors::DecodeError};
 
 pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
@@ -106,39 +106,6 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
             }
 
             Ok(DataType::Array(data))
-        }
-
-        // Map
-        7 => {
-            if buf.len() < 2 {
-                anyhow::bail!(DecodeError::BufTooShortError("map header"))
-            }
-
-            let element_length = buf.get_u16();
-            let mut index = 0;
-            let mut arr: Vec<MapEntry> = Vec::with_capacity(element_length as usize);
-
-            // TODO: Add recursion depth check
-            while index < element_length {
-                let key = handle_decode(buf);
-                if key.is_err() {
-                    return key.with_context(|| {
-                        format!("map decode failed on KEY at element: {}", index)
-                    });
-                }
-                let val = handle_decode(buf);
-                if val.is_err() {
-                    return val.with_context(|| {
-                        format!("map decode failed on VALUE at element: {}", index)
-                    });
-                }
-                let key = key.unwrap();
-                let val = val.unwrap();
-                arr.push(MapEntry { key, val });
-                index += 1;
-            }
-
-            Ok(DataType::Map(arr))
         }
 
         unknown => Err(anyhow::anyhow!(DecodeError::UnknownMetaByte(unknown))),
@@ -351,130 +318,5 @@ mod test {
         ]);
 
         _run_test(&mut buf, expected, "array decode nested array");
-    }
-
-    #[test]
-    fn map_decode() {
-        let mut buf = bytes::BytesMut::new();
-
-        buf.put_u8(0b_0_0000_111); // HEADER = MAP
-        buf.put_u16(11); // MAP ENTRY LEN
-
-        // TYPE = TINY
-        buf.put_u8(0);
-        buf.put_u8(0xFF);
-        buf.put_u8(0);
-        buf.put_u8(0xFF);
-
-        // TYPE = SMALL
-        buf.put_u8(0b_00_001_000);
-        buf.put_u16(0xFF00);
-        buf.put_u8(0b_00_001_000);
-        buf.put_u16(0xFF00);
-
-        // TYPE = MEDIUM
-        buf.put_u8(0b_00_010_000);
-        buf.put_u32(0xDEADBEEF);
-        buf.put_u8(0b_00_010_000);
-        buf.put_u32(0xDEADBEEF);
-
-        // TYPE = LARGE
-        buf.put_u8(0b_00_100_000);
-        buf.put_u64(0xFEEDFACEDEADBEEF);
-        buf.put_u8(0b_00_100_000);
-        buf.put_u64(0xFEEDFACEDEADBEEF);
-
-        // TYPE = FLOATING_S+
-        buf.put_u8(0b_00_110_000);
-        buf.put_f32(0.1234);
-        buf.put_u8(0b_00_110_000);
-        buf.put_f32(0.1234);
-        // TYPE = FLOATING_S-
-        buf.put_u8(0b_00_110_000);
-        buf.put_f32(-0.1234);
-        buf.put_u8(0b_00_110_000);
-        buf.put_f32(-0.1234);
-
-        // TYPE = FLOATING_L+
-        buf.put_u8(0b_00_111_000);
-        buf.put_f64(0.1234);
-        buf.put_u8(0b_00_111_000);
-        buf.put_f64(0.1234);
-        // TYPE = FLOATING_L-
-        buf.put_u8(0b_00_111_000);
-        buf.put_f64(-0.1234);
-        buf.put_u8(0b_00_111_000);
-        buf.put_f64(-0.1234);
-
-        // TYPE = BOOL
-        buf.put_u8(0b_1_0000_100); // True
-        buf.put_u8(0b_0_0000_100); // False
-
-        // TYPE = STRING
-        let string_to_encode = b"multiple\r\nlines\r\nsupported\0null bytes too";
-        buf.put_u8(0b_00000_010);
-        buf.put_u16(string_to_encode.len() as u16);
-        buf.put_slice(string_to_encode);
-        buf.put_u8(0b_00000_010);
-        buf.put_u16(string_to_encode.len() as u16);
-        buf.put_slice(string_to_encode);
-
-        let err_to_encode = crate::data_type::Error {
-            is_server_err: false,
-            err_code: 0x00,
-            err_msg: bytes::Bytes::from_static(b"some message"),
-        };
-
-        buf.put(err_to_encode.encode());
-        buf.put(err_to_encode.encode());
-
-        let expected: Vec<MapEntry> = vec![
-            MapEntry {
-                key: DataType::Num(Int::Tiny(0xFF)),
-                val: DataType::Num(Int::Tiny(0xFF)),
-            },
-            MapEntry {
-                key: DataType::Num(Int::Small(0xFF00)),
-                val: DataType::Num(Int::Small(0xFF00)),
-            },
-            MapEntry {
-                key: DataType::Num(Int::Medium(0xDEADBEEF)),
-                val: DataType::Num(Int::Medium(0xDEADBEEF)),
-            },
-            MapEntry {
-                key: DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
-                val: DataType::Num(Int::Large(0xFEEDFACEDEADBEEF)),
-            },
-            MapEntry {
-                key: DataType::Num(Int::FloatS(OrderedFloat(0.1234))),
-                val: DataType::Num(Int::FloatS(OrderedFloat(0.1234))),
-            },
-            MapEntry {
-                key: DataType::Num(Int::FloatS(OrderedFloat(-0.1234))),
-                val: DataType::Num(Int::FloatS(OrderedFloat(-0.1234))),
-            },
-            MapEntry {
-                key: DataType::Num(Int::FloatL(OrderedFloat(0.1234))),
-                val: DataType::Num(Int::FloatL(OrderedFloat(0.1234))),
-            },
-            MapEntry {
-                key: DataType::Num(Int::FloatL(OrderedFloat(-0.1234))),
-                val: DataType::Num(Int::FloatL(OrderedFloat(-0.1234))),
-            },
-            MapEntry {
-                key: DataType::Bool(true),
-                val: DataType::Bool(false),
-            },
-            MapEntry {
-                key: DataType::String(bytes::Bytes::from_static(string_to_encode)),
-                val: DataType::String(bytes::Bytes::from_static(string_to_encode)),
-            },
-            MapEntry {
-                key: DataType::Error(err_to_encode.clone()),
-                val: DataType::Error(err_to_encode.clone()),
-            },
-        ];
-
-        _run_test(&mut buf, DataType::Map(expected), "map decode");
     }
 }

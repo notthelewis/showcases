@@ -1,14 +1,13 @@
 use bytes::{BufMut, Bytes};
 use ordered_float::OrderedFloat;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DataType {
     Num(Int),
     Bool(bool),
     String(Bytes),
     Error(Error),
     Array(Vec<DataType>),
-    Map(Vec<MapEntry>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -21,7 +20,7 @@ pub(crate) enum Int {
     FloatL(OrderedFloat<f64>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub(crate) struct Error {
     pub is_server_err: bool,
     pub err_code: u8,
@@ -46,10 +45,4 @@ impl Error {
 
         to_return
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct MapEntry {
-    pub key: DataType,
-    pub val: DataType,
 }
