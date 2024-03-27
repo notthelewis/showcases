@@ -1,30 +1,29 @@
+use dashmap::mapref::one;
+
 use crate::{data_type::DataType, store::Store};
 
-pub enum Command<'a> {
-    Get(Get<'a>),
-    Set(Set<'a>),
+pub enum Command {
+    Get(Get),
+    Set(Set),
 }
 
-pub struct Get<'a> {
-    store: &'a mut Store,
+pub struct Get {
+    store: Store,
 }
-pub struct Set<'a> {
-    store: &'a mut Store,
+pub struct Set {
+    store: Store,
 }
 
-impl<'a> Get<'a> {
-    pub fn run(
-        &'a self,
-        key: &DataType,
-    ) -> Option<dashmap::mapref::one::Ref<'a, DataType, DataType>> {
-        self.store.get(key)
+impl Get {
+    pub fn run(&self, k: &DataType) -> Option<one::Ref<DataType, DataType>> {
+        self.store.get(k)
     }
 }
 
-impl<'a> Set<'a> {
+impl Set {
     // When the set command is ran, if a value with the key already exists, it replaces it and returns
     // the old value
-    pub fn run(&'a self, key: &DataType, value: &DataType) -> Option<DataType> {
+    pub fn run(&self, key: &DataType, value: &DataType) -> Option<DataType> {
         self.store.insert(key.to_owned(), value.to_owned())
     }
 }
@@ -44,10 +43,10 @@ mod test {
     fn test_set_get() {
         let store: Store = Arc::new(DashMap::new());
         let get = Get {
-            store: &mut store.clone(),
+            store: store.clone(),
         };
         let set = Set {
-            store: &mut store.clone(),
+            store: store.clone(),
         };
 
         let key = Int::new_u8(0x00);
