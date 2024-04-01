@@ -1,13 +1,23 @@
-# BOOP protocol
+# BOOP 
 
-_Bidirectional.Optimal.Ordnance.Protocol_
+_Bidirectional.Ostensibly.Optimal.Protocol_
+
+# Overview
 
 Since I'm clearly a masochist, I want to build my own protocol for this project.
 
 I'm going to encode data types with lengths pre-determined ahead of time. This prevents the need for sending one byte or
 more in order to specify the length of every field. Simple data types, such as integers, have a known size at encode /
 decode time, so this information does not need to be specifed for every message. Alongside this, this removes the need 
-for control sequences completely. 
+for control sequences completely. I am not using Serde for this project, as I clearly stated I'm a masochist... Plus I
+want to keep dependencies and compile times down to an absolute minimum. I understand the things I'm missing out on by 
+choosing not to use Serde; The biggest drawback being future-proofing the protocol. I cannot predict the future of how 
+this software might be used so I likely won't get every detail right. There are _some_ measures taken to reduce this 
+issue but primarily the requirements are quite static. It's a remote-controlled concurrent hashmap with an extremely 
+simple data format.
+
+Since this project is effectively a simplified Redis, I'll draw some comparisons between `RESP3` and `BOOP`, then 
+explain the design differences.
 
 Redis states:
 > RESP is a compromise among the following considerations:
@@ -16,27 +26,30 @@ Redis states:
 > Fast to parse.
 > Human readable.
 
-`BOOP`'s operational objectives vary considerably from `RESP`'s. I don't care about it being human readable. The main 
-thing reading the protocol isn't going to be humans; it's going to be computers. Tools can be made to print the protocol 
-out in readable ways, if such a thing is needed. Standard UNIX tools like xxd or hexdump can work too.
+`BOOP`'s operational objectives vary considerably from `RESP`'s. It doesn't care about being human readable. The main 
+things reading the protocol aren't going to be humans; They're going to be computers. Tools can be made to print the 
+protocol out in readable ways, if such a thing is needed. Standard tools like xxd, hexdump or wireshark already give a
+solid foundation if you understand the protocol intrinsics.
 
 Removing the human readable compromise, `BOOP` can focus more on the implementation being simple(ish) to implement & 
-efficient to encode and decode. I've gone for the approach of maximum entropy. If, later on down the line I wanted to
-modify the protocol, it would mean large modifications. I'm willing to take that risk on in order to ensure that data is
-encoded in as little space as possible. This is because I'm aiming to make this protocol useful in low bandwidth scenarios.
+efficient to encode and decode... Whilst aiming for optimal wire size. I've gone for the approach of maximum entropy. 
+If, later on down the line, I wanted to modify the protocol it could mean large modifications. I'm willing to take that 
+risk on in order to ensure that data is encoded in as little space as possible. This is because I'm aiming to make 
+`Blewis` optimal for low bandwidth scenarios like a congested dial-up internet connection, or low-power GSM modems on 
+embedded devices. One step that can be taken to reduce the impact of future iterations is to have a handshake process,
+which allows for a protocol version to be agreed upon by server and client.
 
-I'm tempted to use some kind of compression for large strings / arrays, which could be really useful for low
-bandwidth situations (which is what I'm targetting), like a congested dial-up internet connection, or low-power 2G
-embedded devices. 
+I'm tempted to use some kind of compression for large strings / arrays, which could be really useful for low bandwidth
+situations but may be counter productive for embedded devices. If I do use compression, I'm thinking of using Facebook's
+`Zstandard`, as it is efficient to encode & decode and provides truly excellent entropy. They also claim to have 
+excellent small data compression too... which might be useful. I'm not yet sold on whether the compute required 
+warrants the perceived benefit of compression, as the time taken to compress, encode, decompress and decode might 
+negate the benefits of the smaller format.
 
-If I do use compression, I'm thinking of using Facebook's `Zstandard`, as it is efficient to encode & decode and provides
-truly excellent entropy. They also claim to have excellent small data compression too... which might be useful. I'm not 
-yet sold on whether the compute required warrants the perceived benefit of compression, as the time taken to compress, 
-encode, decompress and decode might negate the perceived benefits of a smaller format.
 
 # Network layer
 
-Since this is a Redis clone, the model is going to be client-server. Unlike RESP, `BOOP` will support _multiple_ 
+Since this is a Redis clone, the model is going to be client-server. Unlike `RESP`, `BOOP` will support _multiple_ 
 protocols at the network layer, natively. It will support:
 
 1) TCP
@@ -63,7 +76,161 @@ encode & decode steps and will purely deal with communication between client and
 is that it should be easier to swap out components as long as the interface requirement is met. It allows the same 
 encoding routine to be shared between all of the supported network components too.
 
+## TCP
+TBD. 
+
+## UDP
+TBD. 
+
+## Unix sockets
+TBD. 
+
+## HTTP
+TBD. 
+
+## WebSockets
+TBD. 
+
 # Spec
+
+Similarly to `RESP3`, messages will be passed between client & server via `Frames`. However, the framing of messages 
+in `BOOP` differs wildly to framing of messages in `RESP`. In `RESP`, every message that is sent is prepended with a 
+header byte and suffixed with a `\r\n` control sequence.
+
+In `BOOP`, messages are going to be prepended with meta data and that's it. No suffix is needed. The main benefit being 
+the ability to have full access to every possible combination of bytes. If one wanted to encode any kind of binary data,
+this is a big win. Values don't have to be escaped like they would with a control character. In an embedded device with
+realtime data requirements this might save many wasted clock cycles validating data before it is sent, as opposed to 
+just encoding and sending it. 
+
+## Framing
+
+The way that data is actually framed is Type Length Value, except the length is omitted for data types that have a 
+known value at compile time; namely ints, floats & bools. The data on its own is kind of meaningless though. This is 
+where commands come in. Like with Redis, clients have the ability to store arbitrary data with arbitrary keys and 
+retrieve those values later. Unlike Redis, however, `Blewis` is much less equipped to deal with some of advanced 
+use-cases such as programmability, advanced queries, geospatial data and a few others. 
+
+As a result, the command set is much smaller. We have:
+ - Get:   retrieve a value 
+ - Set:   update, remove or insert a value
+ - Pub:   push updates to a topic
+ - Sub:   receive updates from a topic
+ - Inc:   increment value 
+ - Dec:   decrement value
+
+The first byte of every message sent from a client->server should be a command. Since there's only 7 commands total, we
+can encode this in 3 bits (MSB).
+
+```
+|---------!-----------|
+|         !  position |
+|---------!-----------|
+|  type   ! 0 ! 1 | 2 |
+!=========!===!===!===|
+|   Get   ! 0 ! 0 ! 0 |
+|---------!---!---!---|
+|   Set   ! 1 ! 0 ! 0 |
+|---------!---!---!---|
+|   Pub   ! 0 ! 1 ! 0 |
+|---------!---!---!---|
+|   Sub   ! 0 ! 0 ! 1 |
+|---------!---!---!---|
+|   Inc   ! 1 ! 1 ! 0 |
+|---------!---!---!---|
+|   Dec   ! 1 ! 1 ! 1 |
+|---------!---!---!---|
+```
+
+This leaves 5 bits left in the byte, which can either be padded to zeros or utilised as a bitmap. 
+
+### GET command
+
+#### GET with no flags 
+
+```
+|-------------------------------|
+|             position          |
+|===========|-------------------|
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|===|===|===|===!===!===!===!===|
+| 0 | 0 | 0 | 0 ! 0 ! 0 ! 0 ! 0 |
+|===========|-------------------|
+|    GET    |
+|-----------|
+```
+1) Retrieves a value if it exists
+2) Changes no meta data 
+3) Replies with a single `DataType` with zero extra framing. See `Data Types` for more information.
+
+Text command structure:
+>> GET $keyname
+
+#### GET with delete (GETDEL)
+```
+|-------------------------------|
+|             position          |
+|===========|-------------------|
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|===|===|===|===!===!===!===!===|
+| 0 | 0 | 0 | 1 ! 1 ! 1 ! 1 ! 1 |
+|===========|---!---!---!---!---|
+|    GET    |       DELETE      |
+|-----------|-------------------|
+```
+1) Retrieves a value if it exists
+2) Deletes entry if one is found
+3) Replies with a `BoopError` data type, with a 0 code if successful and other error codes TBD
+
+Text command structure:
+>> GETDEL $keyname
+
+#### GET with set (GETSET)
+
+```
+|-------------------------------|
+|             position          |
+|===========|-------------------|
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|===|===|===|===!===!===!===!===|
+| 0 | 0 | 0 | 0 ! 0 ! 0 ! 0 ! 1 |
+|===========|---!---!---!---!---|
+|    GET    |        SET        |
+|-----------|-------------------|
+```
+1) Retrieves a value if it exists
+2) Sets the value at key regardless of whether one previously existed
+3) Returns the previous value if one was present, otherwise will return a `BoopError`
+
+Text command structure: 
+>> GETSET $keyname $newvalue
+
+### SET command
+
+```
+|-------------------------------|
+|             position          |
+|===========|-------------------|
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|===|===|===|===!===!===!===!===|
+| 0 | 0 | 1 | 0 ! 0 ! 0 ! 0 ! 0 |
+|===========|---!---!---!---!---|
+|    SET    |
+|-----------|
+```
+
+1) Sets a value at the given key.
+2) If an entry already existed, update it and return the old value. 
+    Otherwise, create a new value and return it upon completion.
+
+### PUB command
+
+### SUB command
+### INC command
+### DEC command
+
+
+# Data types
 
 I'm only supporting the following data types;
 1) integer
@@ -95,7 +262,7 @@ then each data type is encoded differently.
 |---------!---!---!---|
 ```
 
-## Integer
+### Integer
 
 I will support the following types of integer:
  - tiny (u8)                0x00
@@ -179,7 +346,7 @@ Here's the encoding of the number 3735928559 (0xDEADBEEF) in the RESP3 protocol:
 
 And here's the encoding of the same number in my version:
 ```
-|  0   |   1  |   2  |   3  |  4   |    <--- BYTES not Bits
+|  0   |   1  |   2  |   3  |  4   |    <--- BYTES not its
 | 0x04 | 0xDE | 0xAD | 0xBE | 0xEF |
 ```
 
@@ -187,8 +354,8 @@ This means that this new binary protocol uses 5 bytes instead of 13. That's 62% 
 it's worth mentioning here that there is a benefit to RESP3 which is as of yet unaccounted for; which is the number of
 system calls to `read()`. If we were reading in the traditional sense yes, our method would incurr more system calls.
 
-However, we're using ✨Rust✨, which is a modern language who, along with all other modern languages, has the concept of 
-a BufferedReader baked right in. So, we're not going to just be reading byte-by-byte. Our buffered reader is going to 
+However, we're using ✨Rust✨, which is a modern language that, along with all other modern languages, has the concept 
+of a BufferedReader baked right in. So, we're not going to just be reading byte-by-byte. Our buffered reader is going to 
 optimise our number of reads from the get-go. So even if the implementation `Read`s twice, it doesn't necessarily call
 the `read()` syscall twice.
 
@@ -202,37 +369,50 @@ reader
     .context("should read upto newline")?;
 
 // Validate \r\n exists properly
-if let Some(newline) = vec_ptr.pop() {
+if let Some(newline) = read_buf.pop() {
     if newline != b'\n' {
         return Err(anyhow::anyhow!("expected last entry to be newline"));
     }
 }
-if let Some(cr) = vec_ptr.pop() {
+if let Some(cr) = read_buf.pop() {
     if cr != b'\r' {
         return Err(anyhow::anyhow!("expected last entry to be carriage return"));
     }
 }
 
-let int: u32 = String::from_utf8(read_buf)
-    .with_context(|| "unable to convert {read_buf} to valid utf-8")?
-    .parse()
-    .context("unable to parse string: {read_buf} to u32")?;
+if let Some(msg_type) = read_buf.get(0) {
+    // Maybe u32 assumption isn't great but this is just a simple example
+    let int: u32 = String::from_utf8(read_buf[1..])
+        .with_context(|| "unable to convert {read_buf} to valid utf-8")?
+        .parse()
+        .context("unable to parse string: {read_buf} to u32")?;
+    // Do something with parsed integer
+}
 
-read_buf.clear();
 ```
 
 The amount of allocations required to do such a simple thing as to read a number from a buffer here are way too 
 substantial. There are more efficient ways of doing this (especially if you don't mind unsafe) but the problem with 
 encoding integers like this is the amount of unnecessary allocations and overalll space required to encode and decode 
-numbers.
+numbers. There is the `atoi` crate, which allows integers to be parsed from ascii, which is likely a more efficient 
+solution. That requires taking a dependency though, and the conversion is still not _free_. Another approach could be:
+```rs
+//          
+//          ascii: [6,  4,  4 ]
+let read_buf = vec![54, 52, 52];
+let num: i32 = read_buf.iter().rev().enumerate().map(|(idx, val)| {
+    (val - 48) * 10.pow(idx) 
+}).sum();
+
+assert_eq!(num, 644);
+```
 
 The way to do this in the BOOP would be something like this:
 
 ```rs
-// NOTE: This won't quite compile, there's a couple things need changing- specifically around the bitshifting etc
 let mut read_buf: Vec<u8> = Vec::with_capacity(MAX_LINE_LEN);
-reader
-    .read_exact(&mut read_buf[..1])
+bufreader
+    .read_exact(&mut read_buf[..2])
     .context("should read meta data")?;
 
 // Get first 6 bits
@@ -240,10 +420,10 @@ let meta_data: u8 = &read_buf[..1];
 match meta_data {
     // If we're handling a u32
     0x10 => {
-        reader
+        bufreader
             .read_exact(4)
             .context("should read 4 bytes")?;
-        let int_u32 = u32::from_ne_bytes(read_buf[2..])
+        let int_u32 = u32::from_ne_bytes(read_buf[2..].try_into().unwrap())
             .context("should convert 4 bytes to u32")?;
     }
 }
@@ -270,14 +450,14 @@ The read routine for the RESP encoded u32 requires:
 In conclusion, there are far fewer allocations required with this proposed protocol, and most of the allocations made 
 reside on the stack, which is far more efficient than going through the allocator to store short-lived, tiny data on the
 heap. Granted, there may be a better way of doing the first method, though it's still not going to get close to data which
-is encoded in the format identical to what most sane programming languages already expect.
+is encoded in the format nearly identical to what most sane programming languages already expect. 
 
 ### Floating point integers
 Floating point will be encoded as IEEE-754, with single precision for f32 and double precision for f64. I won't put many
 words on the subject, as this will be handled almost entirely by the implementation language and is a clear, defined 
 standard with many resources readily available online.
 
-## Bool
+### Bool
 
 A bool is the easiest data type to implement. Since there's only ever 2 states, we can encode all of this state in just 
 a single bit. 0 == false, 1 == true. This means that we can realistically encode a bool within the meta_data byte.
@@ -296,7 +476,7 @@ This is a highly efficient encoding. Not least of all because it's just one byte
 extremely simple to implement and efficient to execute. It can be achieved one or two bitwise `AND` operations, 
 implementation dependent. Or, we could just use it within a big match or switch-case block.
 
-## String
+### String
 
 Strings are just going to be utf-8 encoded byte arrays, with a length prepended in a u16 directly after the meta data.
 This means that the maximum string length is 65535. This means that every string that is encoded is N+2 bytes 
@@ -304,7 +484,7 @@ This means that the maximum string length is 65535. This means that every string
 if we're only encoding tiny strings but the trade off is well worth it, as two bytes is practically zero when encoding
 Hamlet.
 
-## Error
+### Error
 
 An Error message is, for all intents and purposes, one u8 and a String (after the meta data byte). One quirk that I'm 
 encoding though is that the last bit of the meta data block will be set if the error is a server error and unset if it's
@@ -312,7 +492,7 @@ a client error. The u8 after the meta byte is going to contain an error code (0-
 to be encoded. Finally, the error message will just be a length prepended string, following the exact same convention as
 the string data type. 
 
-## Array
+### Array
 
 The encoding for the Array type is designed to be simple to decode and encode, whilst still being efficient in terms of 
 both entropy and implementation. After the meta data byte, 2 bytes will be sent which indicates the number of array 
