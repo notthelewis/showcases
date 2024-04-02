@@ -58,24 +58,6 @@ protocols at the network layer, natively. It will support:
 4) HTTP
 5) WebSockets
 
-This means that there will need to be a unified writing and reading interface, which allows each protocol to be handled
-in a cohesive manner between wildly different protocols. This can be challenging, due to the massive variance between
-each protocol's philosphy and intended use case. 
-
-Initially, I'm going to start off with the following trait:
-
-```rs
-// network/interface.rs
-pub(crate) trait NetworkLayer<ConnectionType, SendFormat, ResponseFormat> {
-    fn send_message(cnx: ConnectionType, to_send: SendFormat) -> anyhow::Result<()>;
-    fn recv_message(cnx: ConnectionType, recv_buf: ResponseFormat) -> anyhow::Result<usize>;
-}
-```
-Each transmission protocol will have a concrete implementation of the above interface. This will be separate from the 
-encode & decode steps and will purely deal with communication between client and server. The benefit of decoupling them
-is that it should be easier to swap out components as long as the interface requirement is met. It allows the same 
-encoding routine to be shared between all of the supported network components too.
-
 ## TCP
 TBD. 
 
