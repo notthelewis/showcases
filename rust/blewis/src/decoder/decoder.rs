@@ -9,44 +9,44 @@ use crate::{
 pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
     if buf.len() < 1 {
-        anyhow::bail!(DecodeError::BufTooShortError("initial meta data byte"))
+        anyhow::bail!(DecodeError::BufTooShort("initial meta data byte"))
     }
 
     match buf.get_u8() {
         // NOTE: All the get_N functions read in BIG ENDIAN order
         0 => {
             if buf.len() < 1 {
-                anyhow::bail!(DecodeError::BufTooShortError("u8"))
+                anyhow::bail!(DecodeError::BufTooShort("u8"))
             }
             Ok(Int::new_u8(buf.get_u8()))
         }
         8 => {
             if buf.len() < 2 {
-                anyhow::bail!(DecodeError::BufTooShortError("u16"))
+                anyhow::bail!(DecodeError::BufTooShort("u16"))
             }
             Ok(Int::new_u16(buf.get_u16()))
         }
         16 => {
             if buf.len() < 4 {
-                anyhow::bail!(DecodeError::BufTooShortError("u32"))
+                anyhow::bail!(DecodeError::BufTooShort("u32"))
             }
             Ok(Int::new_u32(buf.get_u32()))
         }
         32 => {
             if buf.len() < 8 {
-                anyhow::bail!(DecodeError::BufTooShortError("u64"))
+                anyhow::bail!(DecodeError::BufTooShort("u64"))
             }
             Ok(Int::new_u64(buf.get_u64()))
         }
         48 => {
             if buf.len() < 4 {
-                anyhow::bail!(DecodeError::BufTooShortError("f32"))
+                anyhow::bail!(DecodeError::BufTooShort("f32"))
             }
             Ok(Int::new_f32(buf.get_f32()))
         }
         56 => {
             if buf.len() < 8 {
-                anyhow::bail!(DecodeError::BufTooShortError("f64"))
+                anyhow::bail!(DecodeError::BufTooShort("f64"))
             }
             Ok(Int::new_f64(buf.get_f64()))
         }
@@ -59,11 +59,11 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
         2 => {
             if buf.len() < 2 {
-                anyhow::bail!(DecodeError::BufTooShortError("string header"))
+                anyhow::bail!(DecodeError::BufTooShort("string header"))
             }
             let len = buf.get_u16() as usize;
             if buf.len() < len {
-                anyhow::bail!(DecodeError::BufTooShortError("string contents"))
+                anyhow::bail!(DecodeError::BufTooShort("string contents"))
             }
             Ok(BoopString::new(buf.copy_to_bytes(len)))
         }
@@ -71,13 +71,13 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // Error
         6 => {
             if buf.len() < 4 {
-                anyhow::bail!(DecodeError::BufTooShortError("error header"))
+                anyhow::bail!(DecodeError::BufTooShort("error header"))
             }
             let is_server_err = buf.get_u8() != 0;
             let err_code = buf.get_u8();
             let err_len = buf.get_u16() as usize;
             if buf.len() < err_len {
-                anyhow::bail!(DecodeError::BufTooShortError("error value"))
+                anyhow::bail!(DecodeError::BufTooShort("error value"))
             }
             let err_msg = buf.copy_to_bytes(err_len);
             Ok(BoopError::new(is_server_err, err_code, err_msg))
@@ -86,7 +86,7 @@ pub fn handle_decode(buf: &mut bytes::BytesMut) -> anyhow::Result<DataType> {
         // Array
         3 => {
             if buf.len() < 2 {
-                anyhow::bail!(DecodeError::BufTooShortError("array header"))
+                anyhow::bail!(DecodeError::BufTooShort("array header"))
             }
             let element_length = buf.get_u16();
             let mut index = 0;
