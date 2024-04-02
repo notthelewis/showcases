@@ -2,7 +2,12 @@ use crate::{data_type::DataType, errors::GETSET_KEY_NO_EXIST};
 use dashmap::DashMap;
 use std::sync::Arc;
 
-/// Store is the concurrent hashmap that is the core of `Blewis`
+/// Store is the conccurent hashmap that is the core of `Blewis. It is a concurrent hashmap based
+/// on `DashMap` which itself is based on Google's SwissTable. It is a highly performant,
+/// concurrent HashMap that uses shards of RWLocks. The store does allow for weird data structures
+/// that perhaps might seem counter intuitive at first. This is to cater for weird and wonderful
+/// use cases. It is, for example, possible to store a Boolean as a key and an array of Errors for
+/// the value. In fact, any data type that can be encoded via BOOP can be used as a key or a value.
 pub struct Store(Arc<DashMap<DataType, DataType>>);
 
 impl Store {
@@ -10,12 +15,23 @@ impl Store {
         Store(Arc::new(DashMap::new()))
     }
 
+    /// Creates a new Store with a preset capacity
+    pub fn with_capacity(cap: usize) -> Self {
+        Store(Arc::new(DashMap::with_capacity(cap)))
+    }
+    
+    /// Creates a new Store with a preset capacity and shard amount. The shard amount must be a
+    /// power of two. If a none power of two is selected, the program will panic. 
+    pub fn with_capacity_and_shard_amount(cap: usize, shard_amount: usize) -> Self {
+        Store(Arc::new(DashMap::with_capacity_and_shard_amount(cap, shard_amount)))
+    }
+
     /// Retrieves a value from the store
     pub fn get(&self, key: &DataType) -> Option<DataType> {
         let res = self.0.get(key);
         match res {
             Some(v) => Some(v.to_owned()),
-            None => None
+            None => None,
         }
     }
 
