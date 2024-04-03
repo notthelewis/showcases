@@ -2,7 +2,7 @@ use crate::{data_type::DataType, errors::GETSET_KEY_NO_EXIST};
 use dashmap::DashMap;
 use std::sync::Arc;
 
-/// Store is the conccurent hashmap that is the core of `Blewis. It is a concurrent hashmap based
+/// Store is the conccurent hashmap that is the core of `Blewis`. It is a concurrent hashmap based
 /// on `DashMap` which itself is based on Google's SwissTable. It is a highly performant,
 /// concurrent HashMap that uses shards of RWLocks. The store does allow for weird data structures
 /// that perhaps might seem counter intuitive at first. This is to cater for weird and wonderful
