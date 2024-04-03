@@ -2,7 +2,7 @@ use std::{io::Read, net::TcpListener};
 
 use anyhow::{Context, Ok};
 
-use crate::{command_interpreter::decode_command, store::Store};
+use crate::{command::decode_command, store::Store};
 
 use super::tcp_cnx::TcpCnx;
 
@@ -22,7 +22,7 @@ impl TCPServer {
 }
 
 impl TCPServer {
-    fn run(&mut self) -> anyhow::Result<()> {
+    pub fn run(&mut self) -> anyhow::Result<()> {
         // TODO: Async IO
         // TODO: Store connections in the TCPServer struct, for graceful shutdown etc
 
@@ -37,7 +37,7 @@ impl TCPServer {
             let command = decode_command(&mut s.buf)?;
 
             let result = command.execute(self.store.clone());
-            println!("{result:?}")
+            println!("{result:?}");
         }
     }
 }
