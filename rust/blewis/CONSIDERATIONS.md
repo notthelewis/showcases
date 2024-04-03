@@ -24,6 +24,7 @@ This file documents potential considerations for various parts of this project.
   higher entropy encoding format could potentially be devised; using 3 of the padding bits to set the type of the array
   and then the following two bytes for size. Then, each of the data messages could just be sent as they are 
 - Exponential read buffer growth might be a big win, potentially reducing reallocations drastically.
+- Alternative hashing algorithms could/should be provided for the core data store via command line args / config
 
 ## Libraries
 - [anyhow](https://docs.rs/anyhow/latest/anyhow/)
