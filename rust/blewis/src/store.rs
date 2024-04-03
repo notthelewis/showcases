@@ -21,12 +21,15 @@ impl Store {
     pub fn with_capacity(cap: usize) -> Self {
         Store(Arc::new(DashMap::with_capacity(cap)))
     }
-    
+
     /// Creates a new Store with a preset capacity and shard amount. The shard amount must be a
-    /// power of two. If a none power of two is selected, the program will panic. 
+    /// power of two. If a none power of two is selected, the program will panic.
     #[inline(always)]
     pub fn with_capacity_and_shard_amount(cap: usize, shard_amount: usize) -> Self {
-        Store(Arc::new(DashMap::with_capacity_and_shard_amount(cap, shard_amount)))
+        Store(Arc::new(DashMap::with_capacity_and_shard_amount(
+            cap,
+            shard_amount,
+        )))
     }
 
     /// Retrieves a value from the store
