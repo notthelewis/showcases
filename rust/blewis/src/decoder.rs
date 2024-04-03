@@ -74,7 +74,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
                 "string contents",
             )?;
 
-            Ok(BoopString::new(buf.copy_to_bytes(str_len as usize)))
+            Ok(BoopString::new_wrapped(buf.copy_to_bytes(str_len as usize)))
         }
 
         // Error
@@ -194,7 +194,7 @@ mod test {
 
         _run_test(
             &mut buf,
-            BoopString::new(Bytes::from_static(to_encode)),
+            BoopString::new_wrapped(Bytes::from_static(to_encode)),
             "decode a string",
         );
     }
@@ -265,7 +265,7 @@ mod test {
             Int::new_f64(0.1234_f64),
             BoopBool::new_wrapped(true),
             BoopBool::new_wrapped(false),
-            BoopString::new(Bytes::from_static(string_to_encode)),
+            BoopString::new_wrapped(Bytes::from_static(string_to_encode)),
             BoopError::wrap(err_to_encode),
         ];
 

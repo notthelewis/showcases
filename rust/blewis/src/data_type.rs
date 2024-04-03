@@ -56,7 +56,7 @@ impl BoopBool {
 pub(crate) struct BoopString(pub Bytes);
 
 impl BoopString {
-    pub fn new(v: Bytes) -> DataType {
+    pub fn new_wrapped(v: Bytes) -> DataType {
         DataType::String(BoopString(v))
     }
 }

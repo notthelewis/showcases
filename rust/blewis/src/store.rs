@@ -94,7 +94,7 @@ mod test {
     fn getset_entry_exists() {
         let store: Store = Store::new();
 
-        let key = BoopString::new(Bytes::from_static(b"getset"));
+        let key = BoopString::new_wrapped(Bytes::from_static(b"getset"));
         let val = BoopBool::new_wrapped(true);
 
         store.0.insert(key.clone(), val.clone());
@@ -106,7 +106,7 @@ mod test {
         let store: Store = Store::new();
         assert_eq!(
             store.get_set(
-                &BoopString::new(Bytes::from_static(b"no_exist")),
+                &BoopString::new_wrapped(Bytes::from_static(b"no_exist")),
                 &BoopBool::new_wrapped(false)
             ),
             DataType::Error(BoopError {
@@ -120,7 +120,7 @@ mod test {
     #[test]
     fn getdel_entry_exists() {
         let store: Store = Store::new();
-        let key = BoopString::new(Bytes::from_static(b"getset"));
+        let key = BoopString::new_wrapped(Bytes::from_static(b"getset"));
         let val = BoopBool::new_wrapped(true);
 
         store.0.insert(key.clone(), val.clone());
