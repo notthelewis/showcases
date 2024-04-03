@@ -1,3 +1,5 @@
+#![allow(clippy::unusual_byte_groupings)]
+
 use bytes::{BufMut, Bytes};
 use ordered_float::OrderedFloat;
 
