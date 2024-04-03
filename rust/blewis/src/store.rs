@@ -59,10 +59,7 @@ impl Store {
 
     #[inline(always)]
     pub fn get_del(&self, key: &DataType) -> Option<DataType> {
-        match self.0.remove(key) {
-            Some((_, entry)) => Some(entry),
-            None => None,
-        }
+        self.0.remove(key).map(|(_, entry)| entry )
     }
 
     /// When the set command is ran, if a value with the key already exists, it replaces it and returns
