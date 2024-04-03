@@ -1,7 +1,5 @@
-use bytes::Bytes;
 use thiserror::Error;
 
-use crate::data_type::{BoopError, DataType};
 
 #[derive(Error, Debug)]
 pub enum DecodeError {
