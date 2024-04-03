@@ -92,7 +92,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             )?;
             let err_msg = buf.copy_to_bytes(err_len);
 
-            Ok(BoopError::new(is_server_err != 0, err_code, err_msg))
+            Ok(BoopError::new_wrapped(is_server_err != 0, err_code, err_msg))
         }
 
         // Array

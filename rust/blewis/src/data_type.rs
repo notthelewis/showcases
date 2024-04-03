@@ -81,7 +81,7 @@ impl BoopError {
         DataType::Error(self)
     }
 
-    pub fn new(is_server_err: bool, err_code: u8, err_msg: Bytes) -> DataType {
+    pub fn new_wrapped(is_server_err: bool, err_code: u8, err_msg: Bytes) -> DataType {
         BoopError::wrap(BoopError::new_unwrapped(is_server_err, err_code, err_msg))
     }
 
