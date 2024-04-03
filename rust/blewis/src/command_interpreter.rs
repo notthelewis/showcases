@@ -1,9 +1,7 @@
 use anyhow::Ok;
 use bytes::Buf;
 
-use crate::{
-    data_type::DataType, decoder::handle_decode, errors::DecodeError, store::Store,
-};
+use crate::{data_type::DataType, decoder::handle_decode, errors::DecodeError, store::Store};
 
 /// CmdType is the type of command that is to be parsed/executed.
 #[derive(Debug, PartialEq, Eq)]

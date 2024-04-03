@@ -16,7 +16,7 @@ fn check_len(
     buf_msg: &'static str,
 ) -> anyhow::Result<()> {
     if buf.len() < len {
-        if !meta_bytes.is_empty()  {
+        if !meta_bytes.is_empty() {
             // TODO: Potential panic case. Exponential read buffer growth
             buf.put(meta_bytes);
         }
@@ -92,7 +92,11 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             )?;
             let err_msg = buf.copy_to_bytes(err_len);
 
-            Ok(BoopError::new_wrapped(is_server_err != 0, err_code, err_msg))
+            Ok(BoopError::new_wrapped(
+                is_server_err != 0,
+                err_code,
+                err_msg,
+            ))
         }
 
         // Array
@@ -298,7 +302,10 @@ mod test {
         }
 
         let expected = BoopArray::new_wrapped(vec![
-            BoopArray::new_wrapped(vec![BoopBool::new_wrapped(true), BoopBool::new_wrapped(false)]),
+            BoopArray::new_wrapped(vec![
+                BoopBool::new_wrapped(true),
+                BoopBool::new_wrapped(false),
+            ]),
             BoopBool::new_wrapped(true),
         ]);
 
