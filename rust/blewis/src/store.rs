@@ -1,4 +1,4 @@
-use crate::{data_type::DataType, errors::GETSET_KEY_NO_EXIST};
+use crate::data_type::{BoopError, DataType} ;
 use dashmap::DashMap;
 use std::sync::Arc;
 
@@ -36,10 +36,8 @@ impl Store {
     #[inline(always)]
     pub fn get(&self, key: &DataType) -> Option<DataType> {
         let res = self.0.get(key);
-        match res {
-            Some(v) => Some(v.to_owned()),
-            None => None,
-        }
+
+        res.map(|v| v.to_owned())
     }
 
     /// Simillar to set but instead of returning an Option<DataType>, it returns an error code if
@@ -49,7 +47,11 @@ impl Store {
         let existing_val = self.0.insert(key.to_owned(), new_val.to_owned());
 
         if existing_val.is_none() {
-            return GETSET_KEY_NO_EXIST;
+            return DataType::Error(BoopError {
+                is_server_err: true,
+                err_code: 0x10,
+                err_msg: bytes::Bytes::from_static(b"no_exist"),
+            })
         }
 
         existing_val.unwrap().to_owned()
@@ -75,10 +77,7 @@ mod test {
     #![allow(unused_imports)]
 
     use super::Store;
-    use crate::{
-        data_type::{BoopBool, BoopError, BoopString, DataType, Int},
-        errors::GETSET_KEY_NO_EXIST,
-    };
+    use crate::data_type::{BoopBool, BoopError, BoopString, DataType, Int};
     use bytes::Bytes;
     use dashmap::DashMap;
     use std::sync::Arc;
@@ -113,7 +112,11 @@ mod test {
                 &BoopString::new(Bytes::from_static(b"no_exist")),
                 &BoopBool::new(false)
             ),
-            GETSET_KEY_NO_EXIST
+            DataType::Error(BoopError {
+                is_server_err: true,
+                err_code: 0x10,
+                err_msg: bytes::Bytes::from_static(b"no_exist"),
+            })
         );
     }
 
