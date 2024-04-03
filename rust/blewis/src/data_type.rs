@@ -47,7 +47,7 @@ impl Int {
 pub(crate) struct BoopBool(pub bool);
 
 impl BoopBool {
-    pub fn new(v: bool) -> DataType {
+    pub fn new_wrapped(v: bool) -> DataType {
         DataType::Bool(Self(v))
     }
 }

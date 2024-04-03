@@ -57,8 +57,8 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         }
 
         // NOTE: Boolean values don't require any more data. It's just the 1 byte we already read
-        132 => Ok(BoopBool::new(true)),
-        4 => Ok(BoopBool::new(false)),
+        132 => Ok(BoopBool::new_wrapped(true)),
+        4 => Ok(BoopBool::new_wrapped(false)),
 
         // Strings are length prepended byte arrays. We use the `copy_to_bytes` function to
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
@@ -179,8 +179,8 @@ mod test {
         buf.put_u8(0b_1_0000_100); // true
         buf.put_u8(0b_0_0000_100); // false
 
-        _run_test(&mut buf, BoopBool::new(true), "decode a TRUE");
-        _run_test(&mut buf, BoopBool::new(false), "decode a FALSE");
+        _run_test(&mut buf, BoopBool::new_wrapped(true), "decode a TRUE");
+        _run_test(&mut buf, BoopBool::new_wrapped(false), "decode a FALSE");
     }
 
     #[test]
@@ -263,8 +263,8 @@ mod test {
             Int::new_f32(0.1234_f32),
             Int::new_f64(-0.1234_f64),
             Int::new_f64(0.1234_f64),
-            BoopBool::new(true),
-            BoopBool::new(false),
+            BoopBool::new_wrapped(true),
+            BoopBool::new_wrapped(false),
             BoopString::new(Bytes::from_static(string_to_encode)),
             BoopError::wrap(err_to_encode),
         ];
@@ -298,8 +298,8 @@ mod test {
         }
 
         let expected = BoopArray::new(vec![
-            BoopArray::new(vec![BoopBool::new(true), BoopBool::new(false)]),
-            BoopBool::new(true),
+            BoopArray::new(vec![BoopBool::new_wrapped(true), BoopBool::new_wrapped(false)]),
+            BoopBool::new_wrapped(true),
         ]);
 
         _run_test(&mut buf, expected, "array decode nested array");
