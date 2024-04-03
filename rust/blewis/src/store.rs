@@ -16,6 +16,10 @@ impl Store {
         Store(Arc::new(DashMap::new()))
     }
 
+    pub fn clone(&self) -> Self {
+        Store(self.0.clone())
+    }
+
     /// Creates a new Store with a preset capacity
     #[inline(always)]
     pub fn with_capacity(cap: usize) -> Self {
@@ -59,7 +63,7 @@ impl Store {
 
     #[inline(always)]
     pub fn get_del(&self, key: &DataType) -> Option<DataType> {
-        self.0.remove(key).map(|(_, entry)| entry )
+        self.0.remove(key).map(|(_, entry)| entry)
     }
 
     /// When the set command is ran, if a value with the key already exists, it replaces it and returns
