@@ -28,6 +28,7 @@ pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command>  {
         0x00 => parse_get(buf),
         0x01 => parse_get_set(buf),
         0x02 => parse_get_del(buf),
+        0x10 => parse_set(buf),
 
         byte => anyhow::bail!(DecodeError::UnknownMetaByte(byte))
     }
