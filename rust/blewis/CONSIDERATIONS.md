@@ -14,15 +14,16 @@ This file documents potential considerations for various parts of this project.
       This could be exposed as as a configurable parameter, with a sane default chosen (3 levels deep for example)
 
 ### Performance
-- None-blocking IO may be a big win for performance. I.e. epoll() on Linux, kqueue on BSD. For Rust, Mio or Tokio (which uses mio) 
-  handles a lot of the implementation details here. Libuv is a longstanding alternative, written in C++ and used by NodeJS
+- None-blocking IO may be a big win for performance. I.e. epoll() on Linux, kqueue on BSD. For Rust, Mio or Tokio 
+    (which uses mio) handles a lot of the implementation details here. Libuv is a longstanding alternative, written in
+    C++ and used by NodeJS
 - Object pooling may be a big win too
 - Could be a ton of branching logic in the decode routine
-- Some of the larger int types could encode/decode quite poorly on 32bit machines (i.e. u64, f64)
+- Some of the larger int types (u64, f64) could encode/decode quite poorly on machines with a smaller unit size (<32bit)
 - Array could be split into two different encoding formats. If the array is purely numerical and of the same type, a 
   higher entropy encoding format could potentially be devised; using 3 of the padding bits to set the type of the array
   and then the following two bytes for size. Then, each of the data messages could just be sent as they are 
-
+- Exponential read buffer growth might be a big win, potentially reducing reallocations drastically.
 
 ## Libraries
 - [anyhow](https://docs.rs/anyhow/latest/anyhow/)
