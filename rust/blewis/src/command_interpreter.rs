@@ -1,1 +1,1 @@
-mod command_interpreter;
+pub mod command_interpreter;

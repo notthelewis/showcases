@@ -11,22 +11,26 @@ use std::sync::Arc;
 pub struct Store(Arc<DashMap<DataType, DataType>>);
 
 impl Store {
+    #[inline(always)]
     pub fn new() -> Self {
         Store(Arc::new(DashMap::new()))
     }
 
     /// Creates a new Store with a preset capacity
+    #[inline(always)]
     pub fn with_capacity(cap: usize) -> Self {
         Store(Arc::new(DashMap::with_capacity(cap)))
     }
     
     /// Creates a new Store with a preset capacity and shard amount. The shard amount must be a
     /// power of two. If a none power of two is selected, the program will panic. 
+    #[inline(always)]
     pub fn with_capacity_and_shard_amount(cap: usize, shard_amount: usize) -> Self {
         Store(Arc::new(DashMap::with_capacity_and_shard_amount(cap, shard_amount)))
     }
 
     /// Retrieves a value from the store
+    #[inline(always)]
     pub fn get(&self, key: &DataType) -> Option<DataType> {
         let res = self.0.get(key);
         match res {
@@ -37,6 +41,7 @@ impl Store {
 
     /// Simillar to set but instead of returning an Option<DataType>, it returns an error code if
     /// a previous value was not set
+    #[inline(always)]
     pub fn get_set(&self, key: &DataType, new_val: &DataType) -> DataType {
         let existing_val = self.0.insert(key.to_owned(), new_val.to_owned());
 
@@ -47,6 +52,7 @@ impl Store {
         existing_val.unwrap().to_owned()
     }
 
+    #[inline(always)]
     pub fn get_del(&self, key: &DataType) -> Option<DataType> {
         match self.0.remove(key) {
             Some((_, entry)) => Some(entry),
@@ -56,6 +62,7 @@ impl Store {
 
     /// When the set command is ran, if a value with the key already exists, it replaces it and returns
     /// the old value
+    #[inline(always)]
     pub fn set(&self, key: &DataType, value: &DataType) -> Option<DataType> {
         self.0.insert(key.to_owned(), value.to_owned())
     }

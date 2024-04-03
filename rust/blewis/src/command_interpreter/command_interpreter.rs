@@ -1,8 +1,9 @@
 use anyhow::Ok;
 use bytes::Buf;
 
-use crate::{data_type::DataType, decoder::decoder::handle_decode, errors::DecodeError};
+use crate::{data_type::DataType, decoder::decoder::handle_decode, errors::DecodeError, store::Store};
 
+/// CmdType is the type of command that is to be parsed/executed. 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CmdType {
     Get,
@@ -11,6 +12,7 @@ pub enum CmdType {
     Set,
 }
 
+/// Command is the parsed structure of a Command that manipulates the system in some way. 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Command {
     cmd_type: CmdType,
@@ -18,7 +20,30 @@ pub struct Command {
     val: Option<DataType>
 }
 
+impl Command {
+    #[inline(always)]
+    /// Performs the operations specified by the command 
+    pub fn execute(self, store: Store) -> Option<DataType> {
+        match self.cmd_type {
+            CmdType::Get => store.get(&self.key),
+            CmdType::GetSet => {
+                if self.val.is_none() {
+                    return None
+                } 
+                Some(store.get_set(&self.key, &self.val.unwrap()))
+            }
+            CmdType::GetDel => store.get_del(&self.key),
+            CmdType::Set => {
+                if self.val.is_none() {
+                    return None
+                }
+                store.set(&self.key, &self.val.unwrap())
+            }
+        }
+    }
+}
 
+#[inline(always)]
 pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command>  {
     if buf.len() < 1 {
         anyhow::bail!(DecodeError::BufTooShort("command"))
