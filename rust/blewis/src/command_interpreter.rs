@@ -43,7 +43,7 @@ impl Command {
 
 #[inline(always)]
 pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
-    if buf.len() < 1 {
+    if buf.is_empty() {
         anyhow::bail!(DecodeError::BufTooShort("command"))
     }
 
