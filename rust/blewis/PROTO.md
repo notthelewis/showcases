@@ -101,46 +101,13 @@ As a result, the command set is much smaller. We have:
  - Inc:   increment value 
  - Dec:   decrement value
 
-The first byte of every message sent from a client->server should be a command. Since there's only 7 commands total, we
-can encode this in 3 bits (MSB).
-
-```
-|---------!-----------|
-|         !  position |
-|---------!-----------|
-|  type   ! 0 ! 1 | 2 |
-!=========!===!===!===|
-|   Get   ! 0 ! 0 ! 0 |
-|---------!---!---!---|
-|   Set   ! 1 ! 0 ! 0 |
-|---------!---!---!---|
-|   Pub   ! 0 ! 1 ! 0 |
-|---------!---!---!---|
-|   Sub   ! 0 ! 0 ! 1 |
-|---------!---!---!---|
-|   Inc   ! 1 ! 1 ! 0 |
-|---------!---!---!---|
-|   Dec   ! 1 ! 1 ! 1 |
-|---------!---!---!---|
-```
-
-This leaves 5 bits left in the byte, which can either be padded to zeros or utilised as a bitmap. 
+The first byte of every message sent from a client->server should be a command... That is until I decide to implement 
+multiple commands in one transmission. But that's for a future release ;)
 
 ### GET command
 
-#### GET with no flags 
+#### GET with no flags (0x00)
 
-```
-|-------------------------------|
-|             position          |
-|===========|-------------------|
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|===|===|===|===!===!===!===!===|
-| 0 | 0 | 0 | 0 ! 0 ! 0 ! 0 ! 0 |
-|===========|-------------------|
-|    GET    |
-|-----------|
-```
 1) Retrieves a value if it exists
 2) Changes no meta data 
 3) Replies with a single `DataType` with zero extra framing. See `Data Types` for more information.
@@ -148,18 +115,8 @@ This leaves 5 bits left in the byte, which can either be padded to zeros or util
 Text command structure:
 >> GET $keyname
 
-#### GET with delete (GETDEL)
-```
-|-------------------------------|
-|             position          |
-|===========|-------------------|
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|===|===|===|===!===!===!===!===|
-| 0 | 0 | 0 | 1 ! 1 ! 1 ! 1 ! 1 |
-|===========|---!---!---!---!---|
-|    GET    |       DELETE      |
-|-----------|-------------------|
-```
+#### GET with delete (0x01)
+
 1) Retrieves a value if it exists
 2) Deletes entry if one is found
 3) Replies with a `BoopError` data type, with a 0 code if successful and other error codes TBD
@@ -167,19 +124,8 @@ Text command structure:
 Text command structure:
 >> GETDEL $keyname
 
-#### GET with set (GETSET)
+#### GET with set (0x02)
 
-```
-|-------------------------------|
-|             position          |
-|===========|-------------------|
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|===|===|===|===!===!===!===!===|
-| 0 | 0 | 0 | 0 ! 0 ! 0 ! 0 ! 1 |
-|===========|---!---!---!---!---|
-|    GET    |        SET        |
-|-----------|-------------------|
-```
 1) Retrieves a value if it exists
 2) Sets the value at key regardless of whether one previously existed
 3) Returns the previous value if one was present, otherwise will return a `BoopError`
@@ -187,19 +133,7 @@ Text command structure:
 Text command structure: 
 >> GETSET $keyname $newvalue
 
-### SET command
-
-```
-|-------------------------------|
-|             position          |
-|===========|-------------------|
-| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|===|===|===|===!===!===!===!===|
-| 0 | 0 | 1 | 0 ! 0 ! 0 ! 0 ! 0 |
-|===========|---!---!---!---!---|
-|    SET    |
-|-----------|
-```
+### SET command (0x10)
 
 1) Sets a value at the given key.
 2) If an entry already existed, update it and return the old value. 
@@ -377,17 +311,7 @@ The amount of allocations required to do such a simple thing as to read a number
 substantial. There are more efficient ways of doing this (especially if you don't mind unsafe) but the problem with 
 encoding integers like this is the amount of unnecessary allocations and overalll space required to encode and decode 
 numbers. There is the `atoi` crate, which allows integers to be parsed from ascii, which is likely a more efficient 
-solution. That requires taking a dependency though, and the conversion is still not _free_. Another approach could be:
-```rs
-//          
-//          ascii: [6,  4,  4 ]
-let read_buf = vec![54, 52, 52];
-let num: i32 = read_buf.iter().rev().enumerate().map(|(idx, val)| {
-    (val - 48) * 10.pow(idx) 
-}).sum();
-
-assert_eq!(num, 644);
-```
+solution. That requires taking a dependency though, and the conversion is still not _free_. 
 
 The way to do this in the BOOP would be something like this:
 
@@ -397,7 +321,7 @@ bufreader
     .read_exact(&mut read_buf[..2])
     .context("should read meta data")?;
 
-// Get first 6 bits
+// Get first byte
 let meta_data: u8 = &read_buf[..1];
 match meta_data {
     // If we're handling a u32
@@ -435,6 +359,7 @@ heap. Granted, there may be a better way of doing the first method, though it's 
 is encoded in the format nearly identical to what most sane programming languages already expect. 
 
 ### Floating point integers
+
 Floating point will be encoded as IEEE-754, with single precision for f32 and double precision for f64. I won't put many
 words on the subject, as this will be handled almost entirely by the implementation language and is a clear, defined 
 standard with many resources readily available online.
