@@ -108,7 +108,7 @@ impl BoopError {
 pub(crate) struct BoopArray(pub Vec<DataType>);
 
 impl BoopArray {
-    pub fn new(data: Vec<DataType>) -> DataType {
+    pub fn new_wrapped(data: Vec<DataType>) -> DataType {
         DataType::Array(Self(data))
     }
 }

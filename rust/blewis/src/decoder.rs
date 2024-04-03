@@ -117,7 +117,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
                 index += 1;
             }
 
-            Ok(BoopArray::new(data))
+            Ok(BoopArray::new_wrapped(data))
         }
 
         unknown => Err(anyhow::anyhow!(DecodeError::UnknownMetaByte(unknown))),
@@ -269,7 +269,7 @@ mod test {
             BoopError::wrap(err_to_encode),
         ];
 
-        _run_test(&mut buf, BoopArray::new(expected), "array decode");
+        _run_test(&mut buf, BoopArray::new_wrapped(expected), "array decode");
     }
 
     #[test]
@@ -297,8 +297,8 @@ mod test {
             }
         }
 
-        let expected = BoopArray::new(vec![
-            BoopArray::new(vec![BoopBool::new_wrapped(true), BoopBool::new_wrapped(false)]),
+        let expected = BoopArray::new_wrapped(vec![
+            BoopArray::new_wrapped(vec![BoopBool::new_wrapped(true), BoopBool::new_wrapped(false)]),
             BoopBool::new_wrapped(true),
         ]);
 
