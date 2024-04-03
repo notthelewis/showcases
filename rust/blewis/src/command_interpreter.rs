@@ -102,7 +102,7 @@ mod tests {
     use bytes::BufMut;
 
     use crate::{
-        command_interpreter::{parse_get_set, parse_set, CmdType, Command},
+        command::{parse_get_set, parse_set, CmdType, Command},
         data_type::Int,
     };
 
