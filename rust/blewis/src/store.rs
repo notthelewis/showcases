@@ -1,4 +1,4 @@
-use crate::data_type::{BoopError, DataType} ;
+use crate::data_type::{BoopError, DataType};
 use dashmap::DashMap;
 use std::sync::Arc;
 
@@ -51,7 +51,7 @@ impl Store {
                 is_server_err: true,
                 err_code: 0x10,
                 err_msg: bytes::Bytes::from_static(b"no_exist"),
-            })
+            });
         }
 
         existing_val.unwrap().to_owned()
