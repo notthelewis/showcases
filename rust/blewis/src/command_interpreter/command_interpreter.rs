@@ -1,9 +1,11 @@
 use anyhow::Ok;
 use bytes::Buf;
 
-use crate::{data_type::DataType, decoder::decoder::handle_decode, errors::DecodeError, store::Store};
+use crate::{
+    data_type::DataType, decoder::decoder::handle_decode, errors::DecodeError, store::Store,
+};
 
-/// CmdType is the type of command that is to be parsed/executed. 
+/// CmdType is the type of command that is to be parsed/executed.
 #[derive(Debug, PartialEq, Eq)]
 pub enum CmdType {
     Get,
@@ -12,30 +14,30 @@ pub enum CmdType {
     Set,
 }
 
-/// Command is the parsed structure of a Command that manipulates the system in some way. 
+/// Command is the parsed structure of a Command that manipulates the system in some way.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Command {
     cmd_type: CmdType,
     key: DataType,
-    val: Option<DataType>
+    val: Option<DataType>,
 }
 
 impl Command {
     #[inline(always)]
-    /// Performs the operations specified by the command 
+    /// Performs the operations specified by the command
     pub fn execute(self, store: Store) -> Option<DataType> {
         match self.cmd_type {
             CmdType::Get => store.get(&self.key),
             CmdType::GetSet => {
                 if self.val.is_none() {
-                    return None
-                } 
+                    return None;
+                }
                 Some(store.get_set(&self.key, &self.val.unwrap()))
             }
             CmdType::GetDel => store.get_del(&self.key),
             CmdType::Set => {
                 if self.val.is_none() {
-                    return None
+                    return None;
                 }
                 store.set(&self.key, &self.val.unwrap())
             }
@@ -44,7 +46,7 @@ impl Command {
 }
 
 #[inline(always)]
-pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command>  {
+pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
     if buf.len() < 1 {
         anyhow::bail!(DecodeError::BufTooShort("command"))
     }
@@ -55,7 +57,7 @@ pub fn decode_command(buf: &mut bytes::BytesMut) -> anyhow::Result<Command>  {
         0x02 => parse_get_del(buf),
         0x10 => parse_set(buf),
 
-        byte => anyhow::bail!(DecodeError::UnknownMetaByte(byte))
+        byte => anyhow::bail!(DecodeError::UnknownMetaByte(byte)),
     }
 }
 
@@ -65,7 +67,7 @@ fn parse_get(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
     Ok(Command {
         cmd_type: CmdType::Get,
         key,
-        val: None
+        val: None,
     })
 }
 
@@ -73,10 +75,10 @@ fn parse_get_set(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
     let key = handle_decode(buf)?;
     let val = handle_decode(buf)?;
 
-    Ok(Command{
+    Ok(Command {
         cmd_type: CmdType::GetSet,
         key,
-        val: Some(val)
+        val: Some(val),
     })
 }
 
@@ -94,10 +96,10 @@ fn parse_set(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
     let key = handle_decode(buf)?;
     let val = handle_decode(buf)?;
 
-    Ok(Command{
+    Ok(Command {
         cmd_type: CmdType::Set,
         key,
-        val: Some(val)
+        val: Some(val),
     })
 }
 
@@ -105,10 +107,12 @@ fn parse_set(buf: &mut bytes::BytesMut) -> anyhow::Result<Command> {
 mod tests {
     use bytes::BufMut;
 
-    use crate::{command_interpreter::command_interpreter::{parse_get_set, parse_set, CmdType, Command}, data_type::Int};
+    use crate::{
+        command_interpreter::command_interpreter::{parse_get_set, parse_set, CmdType, Command},
+        data_type::Int,
+    };
 
     use super::parse_get;
-
 
     #[test]
     fn parse_get_valid() {
@@ -117,11 +121,14 @@ mod tests {
         buf.put_u8(0xFF);
 
         let result = parse_get(&mut buf);
-        assert_eq!(result.unwrap(), Command{
-            cmd_type: CmdType::Get,
-            key: Int::new_u8(0xFF),
-            val: None,
-        });
+        assert_eq!(
+            result.unwrap(),
+            Command {
+                cmd_type: CmdType::Get,
+                key: Int::new_u8(0xFF),
+                val: None,
+            }
+        );
     }
 
     #[test]
@@ -134,11 +141,14 @@ mod tests {
         buf.put_u8(0xFF);
 
         let result = parse_get_set(&mut buf);
-        assert_eq!(result.unwrap(), Command{
-            cmd_type: CmdType::GetSet,
-            key: Int::new_u8(0xFF),
-            val: Some(Int::new_u8(0xff)),
-        });
+        assert_eq!(
+            result.unwrap(),
+            Command {
+                cmd_type: CmdType::GetSet,
+                key: Int::new_u8(0xFF),
+                val: Some(Int::new_u8(0xff)),
+            }
+        );
     }
 
     #[test]
@@ -151,10 +161,13 @@ mod tests {
         buf.put_u8(0xFF);
 
         let result = parse_set(&mut buf);
-        assert_eq!(result.unwrap(), Command{
-            cmd_type: CmdType::Set,
-            key: Int::new_u8(0xFF),
-            val: Some(Int::new_u8(0xff)),
-        });
+        assert_eq!(
+            result.unwrap(),
+            Command {
+                cmd_type: CmdType::Set,
+                key: Int::new_u8(0xFF),
+                val: Some(Int::new_u8(0xff)),
+            }
+        );
     }
 }
