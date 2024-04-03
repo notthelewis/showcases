@@ -1,10 +1,7 @@
-use std::{io::Read, net::TcpListener};
-
-use anyhow::{Context, Ok};
-
-use crate::{command::decode_command, store::Store};
-
 use super::tcp_cnx::TcpCnx;
+use crate::{command::decode_command, store::Store};
+use anyhow::{Context, Ok};
+use std::{io::Read, net::TcpListener};
 
 pub(crate) struct TCPServer {
     listener: TcpListener,

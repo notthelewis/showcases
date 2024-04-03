@@ -1,10 +1,9 @@
-use anyhow::{Context, Ok};
-use bytes::{Buf, BufMut, BytesMut};
-
 use crate::{
     data_type::{BoopArray, BoopBool, BoopError, BoopString, DataType, Int},
     errors::DecodeError,
 };
+use anyhow::{Context, Ok};
+use bytes::{Buf, BufMut, BytesMut};
 
 /// Check the buffer's length contains at least `len` bytes and if it doesn't, put the following
 /// `meta_bytes` into the buffer and return a DecodeError::BufTooShort, with the given `buf_msg`
