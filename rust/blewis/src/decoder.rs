@@ -64,17 +64,20 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         // Strings are length prepended byte arrays. We use the `copy_to_bytes` function to
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
         2 => {
-            check_len(buf, 2, &[2], "string header")?;
+            check_len(buf, 2, &[meta_byte], "string header")?;
 
             let str_len = buf.get_u16();
 
-            check_len(
-                buf,
-                str_len as usize,
-                &[&[2u8], &str_len.to_be_bytes()[..]].concat(),
-                "string contents",
-            )?;
-
+            // If not enough bytes, clear out the buffer and refil it with any bytes already
+            // consumed, so that next READ can pick up where this left off 
+            if str_len as usize > buf.len() {
+                let msg = buf.copy_to_bytes(buf.len());
+                buf.put_u8(meta_byte);
+                buf.put_u16(str_len);
+                buf.put(msg);
+                anyhow::bail!(DecodeError::BufTooShort("u16"));
+            }
+            
             Ok(BoopString::new_wrapped(buf.copy_to_bytes(str_len as usize)))
         }
 
@@ -86,11 +89,13 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             let err_len = buf.get_u16() as usize;
 
             check_len(
-                buf,
+                &mut buf.clone(), // Shallow copy
                 err_len,
-                &[&[is_server_err, err_code], &err_len.to_be_bytes()[..]].concat(),
+                &buf[..],
+                // &[&[is_server_err, err_code], &err_len.to_be_bytes()[..]].concat(),
                 "error value",
             )?;
+
             let err_msg = buf.copy_to_bytes(err_len);
 
             Ok(BoopError::new_wrapped(
@@ -488,5 +493,35 @@ mod test {
         assert_eq!(buf.get_u8(), 0x05);
         assert_eq!(buf.get_u8(), 0x06);
         assert_eq!(buf.get_u8(), 0x38);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_string_header() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x02); // string header
+        buf.put_u8(0x00);
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("string header").to_string()
+        );
+        assert!(buf.get_u8() == 0x00);
+        assert!(buf.get_u8() == 0x02);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_string_body() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x02); 
+        buf.put_u16(0x04);              // string header
+        buf.put_slice(b"tes");          // string body (missing the "t")
+
+        let cloned = buf.clone();
+        let err = handle_decode(&mut buf);
+
+        // The buffer should remain "untouched" (the bytes are read, then replaced)
+        assert!(err.is_err());
+        assert_eq!(cloned, buf);
     }
 }
