@@ -22,6 +22,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         anyhow::bail!(DecodeError::BufTooShort("meta data byte"));
     }
 
+    let pre_decode_start = &mut buf.clone();
     let meta_byte = buf.get_u8();
 
     match meta_byte {
@@ -65,10 +66,15 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             // If not enough bytes, clear out the buffer and refil it with any bytes already
             // consumed, so that next handle_decode can pick up where this left off
             if str_len as usize > buf.len() {
-                let msg = buf.copy_to_bytes(buf.len());
-                buf.put_u8(meta_byte);
-                buf.put_u16(str_len);
-                buf.put(msg);
+                // Reset buffer to what it was before we started decoding. Use a ptr swap instead
+                // of a memcpy to reduce wasted clock cycles. 
+                // # Safety 
+                // This is safe because both buf and pre_decode_start point to the same
+                // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
+                // will be identical. 
+                unsafe {
+                    std::ptr::swap(buf, pre_decode_start);
+                }
                 anyhow::bail!(DecodeError::BufTooShort("string body"));
             }
 
@@ -83,13 +89,15 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             let err_len = buf.get_u16();
 
             if err_len as usize > buf.len() {
-                let msg = buf.copy_to_bytes(buf.len());
-
-                buf.put_u8(meta_byte);
-                buf.put_u8(is_server_err);
-                buf.put_u8(err_code);
-                buf.put_u16(err_len);
-                buf.put(msg);
+                // Reset buffer to what it was before we started decoding. Use a ptr swap instead
+                // of a memcpy to reduce wasted clock cycles. 
+                // # Safety 
+                // This is safe because both buf and pre_decode_start point to the same
+                // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
+                // will be identical. 
+                unsafe {
+                    std::ptr::swap(buf, pre_decode_start);
+                }
 
                 anyhow::bail!(DecodeError::BufTooShort("error value"))
             }
@@ -107,24 +115,30 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         3 => {
             check_header(buf, 2, meta_byte, "array header")?;
             let element_length = buf.get_u16();
-            let pre_array_start = buf.clone();
 
             let mut data: Vec<DataType> = Vec::with_capacity(element_length as usize);
-
             let mut index = 0;
+
             while index < element_length {
-                // TODO: Add recursion depth check
                 let result = handle_decode(buf);
                 if result.is_err() {
-                    // TODO: Logging
-                    // let err = result.unwrap_err().to_string();
-                    buf.put_u8(meta_byte);
-                    buf.put_u16(element_length);
-                    buf.put(pre_array_start);
+                    // Reset buffer to what it was before we started decoding. Use a ptr swap instead
+                    // of a memcpy to reduce wasted clock cycles. 
+                    // # Safety 
+                    // This is safe because both buf and pre_decode_start point to the same
+                    // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
+                    // will be identical. 
+                    unsafe {
+                        std::ptr::swap(buf, pre_decode_start);
+                    }
+
                     anyhow::bail!("array decode failed at index: {index}");
                 }
 
-                data.push(result.unwrap());
+                // TODO: Recursion check
+                let result = result.unwrap();
+
+                data.push(result);
                 index += 1;
             }
 
@@ -591,8 +605,8 @@ mod test {
         let mut buf = BytesMut::new();
         buf.put_u8(0x03);
         buf.put_u16(0);
-        let decoded = handle_decode(&mut buf);
-        assert_eq!(decoded.unwrap(), BoopArray::new_wrapped(vec![]));
+        let decoded = handle_decode(&mut buf).unwrap();
+        assert_eq!(decoded, BoopArray::new_wrapped(vec![]));
     }
 
     #[test]
