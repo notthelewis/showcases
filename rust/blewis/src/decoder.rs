@@ -2,7 +2,7 @@ use crate::{
     data_type::{BoopArray, BoopBool, BoopError, BoopString, DataType, Int},
     errors::DecodeError,
 };
-use anyhow::{Context, Ok, Result};
+use anyhow::{Ok, Result};
 use bytes::{Buf, BufMut, BytesMut};
 
 /// Check the buffer's length contains at least `n` bytes and if it doesn't, put the `meta`
@@ -18,7 +18,7 @@ fn check_header(buf: &mut BytesMut, n: usize, meta: u8, msg: &'static str) -> Re
 
 pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
-    if buf.len() < 1 {
+    if buf.is_empty() {
         anyhow::bail!(DecodeError::BufTooShort("meta data byte"));
     }
 
@@ -116,11 +116,14 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
                 // TODO: Add recursion depth check
                 let result = handle_decode(buf);
                 if result.is_err() {
+                    // TODO: Logging
+                    // let err = result.unwrap_err().to_string();
                     buf.put_u8(meta_byte);
                     buf.put_u16(element_length);
                     buf.put(pre_array_start);
-                    anyhow::bail!("array decode failed on element: {}", index);
+                    anyhow::bail!("array decode failed at index: {index}");
                 }
+
                 data.push(result.unwrap());
                 index += 1;
             }
@@ -553,7 +556,7 @@ mod test {
         assert!(err.is_err());
         assert_eq!(
             err.unwrap_err().to_string(),
-            "array decode failed on element: 0"
+            "array decode failed at index: 0"
         );
 
         assert_eq!(buf, cloned);
@@ -577,7 +580,7 @@ mod test {
         assert!(err.is_err());
         assert_eq!(
             err.unwrap_err().to_string(),
-            "array decode failed on element: 65534"
+            "array decode failed at index: 65534"
         );
 
         assert_eq!(buf, cloned);
@@ -591,4 +594,20 @@ mod test {
         let decoded = handle_decode(&mut buf);
         assert_eq!(decoded.unwrap(), BoopArray::new_wrapped(vec![]));
     }
+
+    #[test]
+    fn decode_error_of_inner_array_type_is_caught() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x03);
+        buf.put_u16(2);
+        buf.put_u8(0b_1_0000_100); // BoopBool(true)
+        buf.put_u8(0xFF); // unknown byte
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            "array decode failed at index: 1"
+        );
+    } 
 }
