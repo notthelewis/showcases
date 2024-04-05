@@ -129,6 +129,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
     }
 }
 
+#[cfg(test)]
 mod test {
     #![allow(unused_imports)]
 
