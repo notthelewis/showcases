@@ -5,18 +5,13 @@ use crate::{
 use anyhow::{Context, Ok, Result};
 use bytes::{Buf, BufMut, BytesMut};
 
-/// Check the buffer's length contains at least `len` bytes and if it doesn't, put the following
+/// Check the buffer's length contains at least `n` bytes and if it doesn't, put the following
 /// `meta_bytes` into the buffer and return a DecodeError::BufTooShort, with the given `buf_msg`
 #[inline(always)]
-fn check_header(
-    buf: &mut BytesMut,
-    len: usize,
-    meta: u8,
-    errmsg: &'static str,
-) -> Result<()> {
-    if buf.len() < len {
+fn check_header(buf: &mut BytesMut, n: usize, meta: u8, msg: &'static str) -> Result<()> {
+    if buf.len() < n {
         buf.put_u8(meta);
-        anyhow::bail!(DecodeError::BufTooShort(errmsg))
+        anyhow::bail!(DecodeError::BufTooShort(msg))
     }
     Ok(())
 }
@@ -516,7 +511,7 @@ mod test {
         buf.put_u8(0x00); //    is_server_err,
         buf.put_u8(0x01); //    err_code,
         buf.put_u16(0x02); //   err_len,
-        buf.put_u8(0x00);  // Incomplete error data
+        buf.put_u8(0x00); // Incomplete error data
 
         let cloned = buf.clone();
         let err = handle_decode(&mut buf);
