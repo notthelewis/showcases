@@ -28,30 +28,32 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
     check_len(buf, 1, &[], "meta data byte")?;
 
-    match buf.get_u8() {
+    let meta_byte = buf.get_u8();
+
+    match meta_byte {
         // NOTE: All the get_N functions read in BIG ENDIAN order
         0 => {
-            check_len(buf, 1, &[0], "u8")?;
+            check_len(buf, 1, &[meta_byte], "u8")?;
             Ok(Int::new_u8(buf.get_u8()))
         }
         8 => {
-            check_len(buf, 2, &[8], "u16")?;
+            check_len(buf, 2, &[meta_byte], "u16")?;
             Ok(Int::new_u16(buf.get_u16()))
         }
         16 => {
-            check_len(buf, 4, &[16], "u32")?;
+            check_len(buf, 4, &[meta_byte], "u32")?;
             Ok(Int::new_u32(buf.get_u32()))
         }
         32 => {
-            check_len(buf, 8, &[32], "u64")?;
+            check_len(buf, 8, &[meta_byte], "u64")?;
             Ok(Int::new_u64(buf.get_u64()))
         }
         48 => {
-            check_len(buf, 4, &[48], "f32")?;
+            check_len(buf, 4, &[meta_byte], "f32")?;
             Ok(Int::new_f32(buf.get_f32()))
         }
         56 => {
-            check_len(buf, 8, &[56], "f64")?;
+            check_len(buf, 8, &[meta_byte], "f64")?;
             Ok(Int::new_f64(buf.get_f64()))
         }
 
@@ -360,8 +362,11 @@ mod test {
         );
     }
 
+
     #[test]
-    fn insufficient_bytes_for_ints() {
+    /// The insufficient_bytes_for_N tests each validate that the length validation function works,
+    /// and that it leaves any unprocessed bytes on the FIFO stack to be popped off later. 
+    fn insufficient_bytes_for_uint8() {
         let mut buf = BytesMut::new();
         buf.put_u8(0x00); // u8
         let err = handle_decode(&mut buf);
@@ -371,5 +376,116 @@ mod test {
             DecodeError::BufTooShort("u8").to_string()
         );
         assert!(buf.get_u8() == 0x00);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_uint16() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x8); // u16
+        buf.put_u8(0x00);
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("u16").to_string()
+        );
+        assert!(buf.get_u8() == 0x00);
+        assert!(buf.get_u8() == 0x8);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_uint32() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x10); // u32
+        buf.put_u8(0x00);
+        buf.put_u8(0x01);
+        buf.put_u8(0x02);
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("u32").to_string()
+        );
+        assert!(buf.get_u8() == 0x00);
+        assert!(buf.get_u8() == 0x01);
+        assert!(buf.get_u8() == 0x02);
+        assert!(buf.get_u8() == 0x10);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_uint64() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x20); // u64
+        buf.put_u8(0x00);
+        buf.put_u8(0x01);
+        buf.put_u8(0x02);
+        buf.put_u8(0x03);
+        buf.put_u8(0x04);
+        buf.put_u8(0x05);
+        buf.put_u8(0x06);
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("u64").to_string()
+        );
+
+        assert_eq!(buf.get_u8(), 0x00);
+        assert_eq!(buf.get_u8(), 0x01);
+        assert_eq!(buf.get_u8(), 0x02);
+        assert_eq!(buf.get_u8(), 0x03);
+        assert_eq!(buf.get_u8(), 0x04);
+        assert_eq!(buf.get_u8(), 0x05);
+        assert_eq!(buf.get_u8(), 0x06);
+        assert_eq!(buf.get_u8(), 0x20);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_float32() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x30); // u32
+        buf.put_u8(0x00);
+        buf.put_u8(0x01);
+        buf.put_u8(0x02);
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("f32").to_string()
+        );
+        assert!(buf.get_u8() == 0x00);
+        assert!(buf.get_u8() == 0x01);
+        assert!(buf.get_u8() == 0x02);
+        assert!(buf.get_u8() == 0x30);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_float64() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x38); // f64
+        buf.put_u8(0x00);
+        buf.put_u8(0x01);
+        buf.put_u8(0x02);
+        buf.put_u8(0x03);
+        buf.put_u8(0x04);
+        buf.put_u8(0x05);
+        buf.put_u8(0x06);
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("f64").to_string()
+        );
+
+        assert_eq!(buf.get_u8(), 0x00);
+        assert_eq!(buf.get_u8(), 0x01);
+        assert_eq!(buf.get_u8(), 0x02);
+        assert_eq!(buf.get_u8(), 0x03);
+        assert_eq!(buf.get_u8(), 0x04);
+        assert_eq!(buf.get_u8(), 0x05);
+        assert_eq!(buf.get_u8(), 0x06);
+        assert_eq!(buf.get_u8(), 0x38);
     }
 }
