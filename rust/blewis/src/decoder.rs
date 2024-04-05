@@ -67,11 +67,11 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
             // consumed, so that next handle_decode can pick up where this left off
             if str_len as usize > buf.len() {
                 // Reset buffer to what it was before we started decoding. Use a ptr swap instead
-                // of a memcpy to reduce wasted clock cycles. 
-                // # Safety 
+                // of a memcpy to reduce wasted clock cycles.
+                // # Safety
                 // This is safe because both buf and pre_decode_start point to the same
                 // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
-                // will be identical. 
+                // will be identical.
                 unsafe {
                     std::ptr::swap(buf, pre_decode_start);
                 }
@@ -90,11 +90,11 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
 
             if err_len as usize > buf.len() {
                 // Reset buffer to what it was before we started decoding. Use a ptr swap instead
-                // of a memcpy to reduce wasted clock cycles. 
-                // # Safety 
+                // of a memcpy to reduce wasted clock cycles.
+                // # Safety
                 // This is safe because both buf and pre_decode_start point to the same
                 // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
-                // will be identical. 
+                // will be identical.
                 unsafe {
                     std::ptr::swap(buf, pre_decode_start);
                 }
@@ -123,11 +123,11 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
                 let result = handle_decode(buf);
                 if result.is_err() {
                     // Reset buffer to what it was before we started decoding. Use a ptr swap instead
-                    // of a memcpy to reduce wasted clock cycles. 
-                    // # Safety 
+                    // of a memcpy to reduce wasted clock cycles.
+                    // # Safety
                     // This is safe because both buf and pre_decode_start point to the same
                     // underlying chunk of memory, so the lifetime of both pre_decode_start and buf
-                    // will be identical. 
+                    // will be identical.
                     unsafe {
                         std::ptr::swap(buf, pre_decode_start);
                     }
@@ -526,11 +526,11 @@ mod test {
     #[test]
     fn insufficient_bytes_for_error_value() {
         let mut buf = BytesMut::new();
-        buf.put_u8(0x06);   // Error type
-        buf.put_u8(0x00);   //    is_server_err,
-        buf.put_u8(0x01);   //    err_code,
-        buf.put_u16(0x02);  //    err_len,
-        buf.put_u8(0x00);   // <Incomplete error data>
+        buf.put_u8(0x06); // Error type
+        buf.put_u8(0x00); //    is_server_err,
+        buf.put_u8(0x01); //    err_code,
+        buf.put_u16(0x02); //    err_len,
+        buf.put_u8(0x00); // <Incomplete error data>
 
         let cloned = buf.clone();
         let err = handle_decode(&mut buf);
@@ -556,7 +556,7 @@ mod test {
         );
         assert_eq!(buf.get_u8(), 0x00);
         assert_eq!(buf.get_u8(), 0x03);
-    } 
+    }
 
     #[test]
     fn insufficient_bytes_for_array_small_value() {
@@ -564,7 +564,7 @@ mod test {
         buf.put_u8(0x03);
         buf.put_u16(0x01);
 
-        let cloned = buf.clone(); 
+        let cloned = buf.clone();
 
         let err = handle_decode(&mut buf);
         assert!(err.is_err());
@@ -583,11 +583,11 @@ mod test {
         buf.put_u16(u16::MAX);
 
         // All just boolean TRUE values
-        for _ in 0..u16::MAX -1 {
+        for _ in 0..u16::MAX - 1 {
             buf.put_u8(0b_1_0000_100);
         }
 
-        let cloned = buf.clone(); 
+        let cloned = buf.clone();
         println!("{}", buf.len());
 
         let err = handle_decode(&mut buf);
@@ -623,5 +623,5 @@ mod test {
             err.unwrap_err().to_string(),
             "array decode failed at index: 1"
         );
-    } 
+    }
 }
