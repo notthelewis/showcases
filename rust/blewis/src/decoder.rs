@@ -2,58 +2,57 @@ use crate::{
     data_type::{BoopArray, BoopBool, BoopError, BoopString, DataType, Int},
     errors::DecodeError,
 };
-use anyhow::{Context, Ok};
+use anyhow::{Context, Ok, Result};
 use bytes::{Buf, BufMut, BytesMut};
 
 /// Check the buffer's length contains at least `len` bytes and if it doesn't, put the following
 /// `meta_bytes` into the buffer and return a DecodeError::BufTooShort, with the given `buf_msg`
 #[inline(always)]
-fn check_len(
+fn check_header(
     buf: &mut BytesMut,
     len: usize,
-    meta_bytes: &[u8],
-    buf_msg: &'static str,
-) -> anyhow::Result<()> {
+    meta: u8,
+    errmsg: &'static str,
+) -> Result<()> {
     if buf.len() < len {
-        if !meta_bytes.is_empty() {
-            // TODO: Potential panic case. Exponential read buffer growth
-            buf.put(meta_bytes);
-        }
-        anyhow::bail!(DecodeError::BufTooShort(buf_msg))
+        buf.put_u8(meta);
+        anyhow::bail!(DecodeError::BufTooShort(errmsg))
     }
-    anyhow::Ok(())
+    Ok(())
 }
 
 pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
     // NOTE: Length checks are required before all get calls, as bytes::BufMut will panic if insufficient bytes
-    check_len(buf, 1, &[], "meta data byte")?;
+    if buf.len() < 1 {
+        anyhow::bail!(DecodeError::BufTooShort("meta data byte"));
+    }
 
     let meta_byte = buf.get_u8();
 
     match meta_byte {
         // NOTE: All the get_N functions read in BIG ENDIAN order
         0 => {
-            check_len(buf, 1, &[meta_byte], "u8")?;
+            check_header(buf, 1, meta_byte, "u8")?;
             Ok(Int::new_u8(buf.get_u8()))
         }
         8 => {
-            check_len(buf, 2, &[meta_byte], "u16")?;
+            check_header(buf, 2, meta_byte, "u16")?;
             Ok(Int::new_u16(buf.get_u16()))
         }
         16 => {
-            check_len(buf, 4, &[meta_byte], "u32")?;
+            check_header(buf, 4, meta_byte, "u32")?;
             Ok(Int::new_u32(buf.get_u32()))
         }
         32 => {
-            check_len(buf, 8, &[meta_byte], "u64")?;
+            check_header(buf, 8, meta_byte, "u64")?;
             Ok(Int::new_u64(buf.get_u64()))
         }
         48 => {
-            check_len(buf, 4, &[meta_byte], "f32")?;
+            check_header(buf, 4, meta_byte, "f32")?;
             Ok(Int::new_f32(buf.get_f32()))
         }
         56 => {
-            check_len(buf, 8, &[meta_byte], "f64")?;
+            check_header(buf, 8, meta_byte, "f64")?;
             Ok(Int::new_f64(buf.get_f64()))
         }
 
@@ -64,39 +63,43 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         // Strings are length prepended byte arrays. We use the `copy_to_bytes` function to
         // leverage the Bytes package's shallow copy mechanism, as opposed to making a full copy.
         2 => {
-            check_len(buf, 2, &[meta_byte], "string header")?;
+            check_header(buf, 2, meta_byte, "string header")?;
 
             let str_len = buf.get_u16();
 
             // If not enough bytes, clear out the buffer and refil it with any bytes already
-            // consumed, so that next READ can pick up where this left off 
+            // consumed, so that next handle_decode can pick up where this left off
             if str_len as usize > buf.len() {
                 let msg = buf.copy_to_bytes(buf.len());
                 buf.put_u8(meta_byte);
                 buf.put_u16(str_len);
                 buf.put(msg);
-                anyhow::bail!(DecodeError::BufTooShort("u16"));
+                anyhow::bail!(DecodeError::BufTooShort("string body"));
             }
-            
+
             Ok(BoopString::new_wrapped(buf.copy_to_bytes(str_len as usize)))
         }
 
         // Error
         6 => {
-            check_len(buf, 4, &[6], "error header")?;
+            check_header(buf, 4, meta_byte, "error header")?;
             let is_server_err = buf.get_u8();
             let err_code = buf.get_u8();
-            let err_len = buf.get_u16() as usize;
+            let err_len = buf.get_u16();
 
-            check_len(
-                &mut buf.clone(), // Shallow copy
-                err_len,
-                &buf[..],
-                // &[&[is_server_err, err_code], &err_len.to_be_bytes()[..]].concat(),
-                "error value",
-            )?;
+            if err_len as usize > buf.len() {
+                let msg = buf.copy_to_bytes(buf.len());
 
-            let err_msg = buf.copy_to_bytes(err_len);
+                buf.put_u8(meta_byte);
+                buf.put_u8(is_server_err);
+                buf.put_u8(err_code);
+                buf.put_u16(err_len);
+                buf.put(msg);
+
+                anyhow::bail!(DecodeError::BufTooShort("error value"))
+            }
+
+            let err_msg = buf.copy_to_bytes(err_len as usize);
 
             Ok(BoopError::new_wrapped(
                 is_server_err != 0,
@@ -107,7 +110,7 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
 
         // Array
         3 => {
-            check_len(buf, 2, &[3], "array header")?;
+            check_header(buf, 2, meta_byte, "array header")?;
             let element_length = buf.get_u16();
             let mut index = 0;
             let mut data: Vec<DataType> = Vec::with_capacity(element_length as usize);
@@ -320,44 +323,6 @@ mod test {
     }
 
     #[test]
-    fn check_len_u16_recomposition() {
-        let mut buf = bytes::BytesMut::new();
-        buf.put_u16(255);
-
-        let str_len = buf.get_u16();
-        assert_eq!(str_len, 255);
-
-        assert!(check_len(
-            &mut buf,
-            str_len as usize,
-            &[&[2u8], &str_len.to_be_bytes()[..]].concat(),
-            "string contents",
-        )
-        .is_err());
-
-        // Add 3 because check_len should put the meta byte and the two length bytes back
-        assert_eq!(buf.len(), 3);
-
-        // Test the right things are put back into the buffer
-        assert_eq!(buf.get_u8(), 2);
-        assert_eq!(buf.get_u16(), 255);
-
-        for i in 0..str_len {
-            buf.put_u8(i as u8);
-        }
-
-        assert_eq!(buf.len(), 255);
-
-        assert!(check_len(
-            &mut buf,
-            str_len as usize,
-            &[&[2u8], &str_len.to_be_bytes()[..]].concat(),
-            "string contents",
-        )
-        .is_ok());
-    }
-
-    #[test]
     fn missing_meta_byte() {
         let mut buf = BytesMut::new();
         assert!(handle_decode(&mut buf).is_err());
@@ -368,10 +333,9 @@ mod test {
         );
     }
 
-
     #[test]
     /// The insufficient_bytes_for_N tests each validate that the length validation function works,
-    /// and that it leaves any unprocessed bytes on the FIFO stack to be popped off later. 
+    /// and that it leaves any unprocessed bytes on the FIFO stack to be popped off later.
     fn insufficient_bytes_for_uint8() {
         let mut buf = BytesMut::new();
         buf.put_u8(0x00); // u8
@@ -513,15 +477,55 @@ mod test {
     #[test]
     fn insufficient_bytes_for_string_body() {
         let mut buf = BytesMut::new();
-        buf.put_u8(0x02); 
-        buf.put_u16(0x04);              // string header
-        buf.put_slice(b"tes");          // string body (missing the "t")
+        buf.put_u8(0x02);
+        buf.put_u16(0x04); // string header
+        buf.put_slice(b"tes"); // string body (missing the "t")
+
+        let cloned = buf.clone();
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("string body").to_string()
+        );
+
+        // The buffer should remain "untouched" (the bytes are read, then replaced)
+        assert_eq!(cloned, buf);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_error_header() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x06); // Error type
+        buf.put_u8(0x00); //    is_server_err,
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("error header").to_string()
+        );
+        assert_eq!(buf.get_u8(), 0x00);
+        assert_eq!(buf.get_u8(), 0x06);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_error_value() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x06); // Error type
+        buf.put_u8(0x00); //    is_server_err,
+        buf.put_u8(0x01); //    err_code,
+        buf.put_u16(0x02); //   err_len,
+        buf.put_u8(0x00);  // Incomplete error data
 
         let cloned = buf.clone();
         let err = handle_decode(&mut buf);
 
-        // The buffer should remain "untouched" (the bytes are read, then replaced)
         assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("error value").to_string()
+        );
         assert_eq!(cloned, buf);
     }
 }
