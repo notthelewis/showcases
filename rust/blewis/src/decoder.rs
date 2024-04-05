@@ -5,8 +5,8 @@ use crate::{
 use anyhow::{Context, Ok, Result};
 use bytes::{Buf, BufMut, BytesMut};
 
-/// Check the buffer's length contains at least `n` bytes and if it doesn't, put the following
-/// `meta_bytes` into the buffer and return a DecodeError::BufTooShort, with the given `buf_msg`
+/// Check the buffer's length contains at least `n` bytes and if it doesn't, put the `meta`
+/// byte into the buffer and return a DecodeError::BufTooShort, with the given `buf_msg`
 #[inline(always)]
 fn check_header(buf: &mut BytesMut, n: usize, meta: u8, msg: &'static str) -> Result<()> {
     if buf.len() < n {
@@ -107,19 +107,19 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
         3 => {
             check_header(buf, 2, meta_byte, "array header")?;
             let element_length = buf.get_u16();
-            let mut index = 0;
+            let pre_array_start = buf.clone();
+
             let mut data: Vec<DataType> = Vec::with_capacity(element_length as usize);
 
-            // TODO: Work out how to do this better
-            let pre_array_start = bytes::BytesMut::from(&buf[..]);
-
-            // TODO: Add recursion depth check
+            let mut index = 0;
             while index < element_length {
+                // TODO: Add recursion depth check
                 let result = handle_decode(buf);
                 if result.is_err() {
-                    *buf = pre_array_start;
-                    return result
-                        .with_context(|| format!("array decode failed on element: {}", index));
+                    buf.put_u8(meta_byte);
+                    buf.put_u16(element_length);
+                    buf.put(pre_array_start);
+                    anyhow::bail!("array decode failed on element: {}", index);
                 }
                 data.push(result.unwrap());
                 index += 1;
@@ -135,6 +135,8 @@ pub fn handle_decode(buf: &mut BytesMut) -> anyhow::Result<DataType> {
 #[cfg(test)]
 mod test {
     #![allow(unused_imports)]
+
+    use std::u16;
 
     use super::*;
     use anyhow::Context;
@@ -507,11 +509,11 @@ mod test {
     #[test]
     fn insufficient_bytes_for_error_value() {
         let mut buf = BytesMut::new();
-        buf.put_u8(0x06); // Error type
-        buf.put_u8(0x00); //    is_server_err,
-        buf.put_u8(0x01); //    err_code,
-        buf.put_u16(0x02); //   err_len,
-        buf.put_u8(0x00); // Incomplete error data
+        buf.put_u8(0x06);   // Error type
+        buf.put_u8(0x00);   //    is_server_err,
+        buf.put_u8(0x01);   //    err_code,
+        buf.put_u16(0x02);  //    err_len,
+        buf.put_u8(0x00);   // <Incomplete error data>
 
         let cloned = buf.clone();
         let err = handle_decode(&mut buf);
@@ -522,5 +524,71 @@ mod test {
             DecodeError::BufTooShort("error value").to_string()
         );
         assert_eq!(cloned, buf);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_array_header() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x03);
+        buf.put_u8(0x00);
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            DecodeError::BufTooShort("array header").to_string()
+        );
+        assert_eq!(buf.get_u8(), 0x00);
+        assert_eq!(buf.get_u8(), 0x03);
+    } 
+
+    #[test]
+    fn insufficient_bytes_for_array_small_value() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x03);
+        buf.put_u16(0x01);
+
+        let cloned = buf.clone(); 
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            "array decode failed on element: 0"
+        );
+
+        assert_eq!(buf, cloned);
+    }
+
+    #[test]
+    fn insufficient_bytes_for_array_large_value() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x03);
+        buf.put_u16(u16::MAX);
+
+        // All just boolean TRUE values
+        for _ in 0..u16::MAX -1 {
+            buf.put_u8(0b_1_0000_100);
+        }
+
+        let cloned = buf.clone(); 
+        println!("{}", buf.len());
+
+        let err = handle_decode(&mut buf);
+        assert!(err.is_err());
+        assert_eq!(
+            err.unwrap_err().to_string(),
+            "array decode failed on element: 65534"
+        );
+
+        assert_eq!(buf, cloned);
+    }
+
+    #[test]
+    fn zero_entry_in_array() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(0x03);
+        buf.put_u16(0);
+        let decoded = handle_decode(&mut buf);
+        assert_eq!(decoded.unwrap(), BoopArray::new_wrapped(vec![]));
     }
 }
