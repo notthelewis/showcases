@@ -1,40 +1,48 @@
+use std::net::SocketAddr;
+
 use super::tcp_cnx::TcpCnx;
 use crate::{command::decode_command, store::Store};
-use anyhow::{Context, Ok};
-use std::{io::Read, net::TcpListener};
+use anyhow::Context;
+use tokio::{io::AsyncReadExt, net::TcpListener};
 
-pub(crate) struct TCPServer {
-    listener: TcpListener,
-    store: Store,
-}
+pub async fn run_tcp(port: &str, store: Store) -> anyhow::Result<()> {
+    let listener = TcpListener::bind(port).await?;
 
-impl TCPServer {
-    pub fn new(port: &str, store: Store) -> anyhow::Result<Self> {
-        Ok(TCPServer {
-            listener: TcpListener::bind(port)
-                .with_context(|| format!("Should bind to port {port}"))?,
-            store,
-        })
+    loop {
+        let (cnx, sockaddr) = listener.accept().await.context("couldn't accept client")?;
+        let s = TcpCnx::new(cnx);
+        let store = store.clone();
+
+        tokio::spawn(async move {
+            handle_connection(store, s, sockaddr).await;
+        });
     }
 }
 
-impl TCPServer {
-    pub fn run(&mut self) -> anyhow::Result<()> {
-        // TODO: Async IO
-        // TODO: Store connections in the TCPServer struct, for graceful shutdown etc
-
-        loop {
-            let (cnx, _) = self.listener.accept().context("couldn't get client")?;
-            let mut s = TcpCnx::new(cnx);
-
-            // TODO: Handshake
-
-            let bytes_read = s.cnx.read(&mut s.buf)?;
-            println!("{bytes_read}");
-            let command = decode_command(&mut s.buf)?;
-
-            let result = command.execute(self.store.clone());
-            println!("{result:?}");
-        }
+async fn handle_connection(store: Store, mut s: TcpCnx, sockaddr: SocketAddr) {
+    // TODO: Handshake
+    
+    let bytes_read = s.cnx.read(&mut s.buf).await;
+    if bytes_read.is_err() {
+        eprintln!(
+            "err: {} when reading from socket: {}",
+            bytes_read.unwrap_err(),
+            sockaddr
+        );
+        return;
     }
+
+    let command = decode_command(&mut s.buf);
+    if command.is_err() {
+        // TODO: Handle errors better
+        eprintln!(
+            "err: {} when decoding command from socket: {}",
+            command.unwrap_err(),
+            sockaddr
+        );
+        return;
+    }
+
+    let result = command.unwrap().execute(store);
+    println!("{result:?}");
 }

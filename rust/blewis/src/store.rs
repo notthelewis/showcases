@@ -8,6 +8,7 @@ use std::sync::Arc;
 /// that perhaps might seem counter intuitive at first. This is to cater for weird and wonderful
 /// use cases. It is, for example, possible to store a Boolean as a key and an array of Errors for
 /// the value. In fact, any data type that can be encoded via BOOP can be used as both a key and a value.
+#[derive(Debug)]
 pub struct Store(Arc<DashMap<DataType, DataType>>);
 
 impl Store {
