@@ -1,5 +1,7 @@
 #![allow(clippy::unusual_byte_groupings)]
 
+use std::fmt::Display;
+
 use bytes::{BufMut, Bytes};
 use ordered_float::OrderedFloat;
 
@@ -10,6 +12,46 @@ pub(crate) enum DataType {
     String(BoopString),
     Error(BoopError),
     Array(BoopArray),
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Num(x) => match x {
+                Int::Tiny(_) => Ok(write!(f, "{:?}", *x)?),
+                Int::Medium(_) => Ok(write!(f, "{:?}", *x)?),
+                Int::Small(_) => Ok(write!(f, "{:?}", *x)?),
+                Int::Large(_) => Ok(write!(f, "{:?}", *x)?),
+                Int::FloatS(_) => Ok(write!(f, "{:?}", *x)?),
+                Int::FloatL(_) => Ok(write!(f, "{:?}", *x)?),
+            },
+            DataType::Bool(x) => Ok(write!(f, "{:?}", *x)?),
+            DataType::String(x) => Ok(write!(f, "{:?}", x)?),
+            DataType::Array(x) => Ok(write!(f, "{:?}", x)?),
+            DataType::Error(x) => Ok(write!(f, "{:?}", x)?),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::data_type::{BoopBool, DataType, Int};
+
+    #[test]
+    fn test_display() {
+        let dt = DataType::Num(Int::Tiny(10));
+        println!("{dt}");
+        let dt = DataType::Num(Int::Small(10));
+        println!("{dt}");
+        let dt = Int::new_f32(10.1);
+        println!("{dt}");
+        let dt = Int::new_f64(10.1);
+        println!("{dt}");
+        let dt = DataType::Bool(BoopBool(true));
+        println!("{dt}");
+        let dt = DataType::Bool(BoopBool(false));
+        println!("{dt}");
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
