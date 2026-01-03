@@ -64,7 +64,12 @@ errors where the meaning is still clear).
 
 Port 17
 
-### 1.5 - Join ISOC
+### 1.5 - Find out IP address and check whether it's multi homed
+
+### 1.6 - Obtain a copy of RFC 1000 and find out where the term RFC originated
+
+
+### 1.7 - Join ISOC
 
 Joined... they actually have some sweet courses for free.
 
